@@ -31,7 +31,10 @@ const client = new OpenAI({
     baseURL: "https://gateway.ai.cloudflare.com/v1/9536a9ec53cf05783eefb6f6d1c06292/reco-test/openai"
 });
 
-// Add this helper function
+// Add this variable to track QR sending status
+const qrSentStatus = new Map();
+
+// Modify the sendPromoQR function to track sending status
 async function sendPromoQR(jid, qrCode) {
   try {
     const promo = QR_PROMOTIONS[qrCode];
@@ -44,6 +47,7 @@ async function sendPromoQR(jid, qrCode) {
       image: { url: promo.path },
       caption: `🎁 ¡Presenta este QR para utilizar la promoción!`
     });
+    
   } catch (error) {
     console.error('Error sending QR promotion:', error);
     await globalClient.sendMessage(jid, { 
@@ -65,7 +69,7 @@ async function shouldUpdateCartelera() {
     }
 }
 function calculateTypingTime(text) {
-    const wordsPerMinute = 200; // Increased typing speed
+    const wordsPerMinute = 400; // Increased typing speed
     const words = text.split(' ').length;
     const typingTime = Math.max(500, (words / wordsPerMinute) * 60 * 1000); // Minimum 500ms delay
     return typingTime;
@@ -86,8 +90,8 @@ async function updateCartelera() {
     }
 }
 
-// Run update every hour
-cron.schedule('0 * * * *', updateCartelera);
+// Run update once per day at midnight
+// cron.schedule('0 0 * * *', updateCartelera);
 
 // Process each message
 const proc = async m => {
@@ -130,15 +134,21 @@ const proc = async m => {
             return;
         }
 
-        // Update conversation history
+        // Get user history including sent promotions
+        const userHistory = getMessages(jid);
+        
+        // Update conversation history with user message
         updateConversationHistory(jid, 'user', msg);
-        const messages = getMessages(jid);
 
         // Read the current cartelera data
         const cartelera = await fs.readFile('cinepolis_cartelera.md', 'utf-8');
 
-        // Prepare prompt with cartelera data
-        const prompt = `${promptBuilder.buildGeneralPrompt(cartelera)}`;
+        // Prepare prompt with cartelera data and user state
+        const prompt = `${promptBuilder.buildGeneralPrompt(cartelera)}
+        
+        ESTADO ACTUAL DEL USUARIO:
+        Promociones ya enviadas: ${Array.from(userHistory.sentPromotions).join(', ')}
+        Última promoción seleccionada: ${userHistory.state.promocionSeleccionada || 'ninguna'}`;
 
         // Send typing indicator
         await globalClient.presenceSubscribe(jid);
@@ -147,7 +157,8 @@ const proc = async m => {
 
         console.log('\n=== OpenAI Request ===');
         console.log('User Message:', msg);
-        console.log('Conversation History Length:', messages.conversation.length);
+        console.log('Conversation History Length:', userHistory.conversation.length);
+        console.log('Sent Promotions:', Array.from(userHistory.sentPromotions));
         console.log('=====================\n');
         const startTime = Date.now();
 
@@ -156,7 +167,7 @@ const proc = async m => {
             messages: [
                 { role: "developer", content: prompt },
                 { role: "system", content: `El nombre del usuario es ${pushName || 'unknown'}` },
-                ...messages.conversation.map((entry) => ({ role: entry.role, content: entry.content })),
+                ...userHistory.conversation.map((entry) => ({ role: entry.role, content: entry.content })),
                 { role: "user", content: msg }
             ],
             max_tokens: 16000,
@@ -173,12 +184,10 @@ const proc = async m => {
         const botResponse = jsonResponse.messageToUser;
         const userState = jsonResponse.userData;
 
-
         console.log('\n=== OpenAI Response ===');
         console.log('Response:', botResponse);
         console.log('userState:', userState);
         console.log('======================\n');
-
 
         const elapsedTime = Date.now() - startTime;
         const typingTime = calculateTypingTime(botResponse);
@@ -187,16 +196,55 @@ const proc = async m => {
             await delay(remainingTime);
         }
 
+        // Update conversation with bot response and new state
         updateConversationHistory(jid, 'assistant', botResponse, userState);
 
         await globalClient.sendMessage(jid, { text: botResponse });
-        if(jsonResponse.readyToSendPromo){
-            // Check if the response contains a QR code reference
-                await sendPromoQR(jid, 'QR1');
-                // Reset the user state
-                const userStateUpdated = resetConversationState(jid);
-                updateConversationHistory(jid, 'developer', "A partir de ahora el estado del usuario se reinicia para seguir con otra conversacion.", userStateUpdated);
+
+        // Debug logging for QR conditions
+        console.log('\n=== QR Send Conditions ===');
+        console.log('readyToSendPromo:', jsonResponse.readyToSendPromo);
+        console.log('promocionSeleccionada:', userState.promocionSeleccionada);
+        console.log('sentPromotions:', Array.from(userHistory.sentPromotions));
+        console.log('========================\n');
+
+        // Only send QR if:
+        // 1. readyToSendPromo is true
+        // 2. A promotion is selected
+        // 3. This specific promotion hasn't been sent before
+        if (jsonResponse.readyToSendPromo && 
+            userState.promocionSeleccionada && 
+            !userHistory.sentPromotions.has(userState.promocionSeleccionada)) {
+            
+            console.log('Sending QR for promotion:', userState.promocionSeleccionada);
+            
+            // Map promotion names to QR codes
+            const promoToQR = {
+                'Mac & Cheese Boneless': 'QR1',
+                'Touchdown Ruffles Dog': 'QR2',
+                'Mega Combo Baguis': 'QR3',
+                'Comboletos 1': 'QR4',
+                'Fiesta Cinépolis': 'QR5',
+                '10ª Temporada de Premios Cinépolis': 'QR6'
+            };
+
+            const qrCode = promoToQR[userState.promocionSeleccionada];
+            if (!qrCode) {
+                console.error('No QR code mapping found for promotion:', userState.promocionSeleccionada);
+                return;
             }
+            
+            try {
+                await sendPromoQR(jid, qrCode);
+                // Only update sent promotions after successful QR sending
+                userHistory.sentPromotions.add(userState.promocionSeleccionada);
+                console.log('QR sent successfully for:', userState.promocionSeleccionada);
+            } catch (error) {
+                console.error('Failed to send QR:', error);
+            }
+        } else {
+            console.log('Skipping QR send due to conditions not met');
+        }
 
         await globalClient.sendPresenceUpdate('paused', jid);
     } catch (error) {
@@ -213,12 +261,22 @@ const processMessage = message => queue.add(() => proc(message));
 // Conversation history management
 function updateConversationHistory(userId, role, content, state) {
     if (!conversationHistory.has(userId)) {
-        conversationHistory.set(userId, { conversation: [], lastInteraction: Date.now(), state: {} });
+        conversationHistory.set(userId, { 
+            conversation: [], 
+            lastInteraction: Date.now(), 
+            state: {},
+            sentPromotions: new Set() // Track sent promotions
+        });
     }
 
-    conversationHistory.get(userId).conversation.push({ role, content });
-    conversationHistory.get(userId).lastInteraction = Date.now();
-    if(state) conversationHistory.get(userId).state = { ...conversationHistory.get(userId).state, ...state };
+    const userHistory = conversationHistory.get(userId);
+    userHistory.conversation.push({ role, content });
+    userHistory.lastInteraction = Date.now();
+    
+    if(state) {
+        userHistory.state = { ...userHistory.state, ...state };
+        // Remove automatic promotion tracking here - we'll do it after successful QR sending
+    }
 
     // Clean up old conversations (1 hour TTL)
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
@@ -228,15 +286,13 @@ function updateConversationHistory(userId, role, content, state) {
         }
     }
 }
-function resetConversationState(userId) {
-    const userState = conversationHistory.get(userId).state;
-    userState.readyToSendPromo = false;
-    userState.userData = {...userState.userData, tipoPromo: null, numPersonas: null, promocionSeleccionada: null};
-    return userState;
-}
 
 function getMessages(userId) {
-    return conversationHistory.get(userId) || [];
+    return conversationHistory.get(userId) || { 
+        conversation: [], 
+        state: {}, 
+        sentPromotions: new Set() 
+    };
 }
 
 // WhatsApp connection setup

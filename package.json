@@ -11,10 +11,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@langchain/langgraph": "^0.3.3",
+    "@langchain/openai": "^0.5.13",
     "@mendable/firecrawl-js": "^1.16.0",
     "@whiskeysockets/baileys": "^6.7.13",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.7",
+    "langchain": "^0.3.28",
     "lodash": "^4.17.21",
     "lowdb": "^7.0.1",
     "node-cron": "^3.0.3",

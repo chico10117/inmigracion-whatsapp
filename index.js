@@ -133,32 +133,43 @@ const proc = async m => {
                 // Guardar el buffer como archivo temporal
                 fs.writeFileSync(tempFilePath, mediaBuffer);
                 
-                // Crear el loader de OpenAI Whisper
-                const loader = new OpenAIWhisperAudio(tempFilePath, {
-                });
+                // Crear el loader de OpenAI Whisper con configuración simplificada
+                const loader = new OpenAIWhisperAudio(tempFilePath);
                 
                 // Realizar la transcripción
                 const docs = await loader.load();
                 const transcribedText = docs[0]?.pageContent || "";
                 
                 // Limpiar el archivo temporal
-                fs.unlinkSync(tempFilePath);
+                try {
+                    fs.unlinkSync(tempFilePath);
+                } catch (cleanupError) {
+                    console.warn("Could not clean up temp file:", cleanupError);
+                }
                 
                 if (transcribedText.trim()) {
-                    // Enviar el mensaje transcrito al grafo
-                    output = await graph.invoke({
-                        jid,
-                        messages: [{ role: "user", content: transcribedText }]
-                    }, {
-                        configurable: { thread_id: jid }
-                    });
+                    // Enviar el mensaje transcrito al grafo con manejo de errores mejorado
+                    try {
+                        output = await graph.invoke({
+                            jid,
+                            messages: [{ role: "user", content: transcribedText }]
+                        }, {
+                            configurable: { thread_id: jid }
+                        });
+                    } catch (graphError) {
+                        console.error("Error en el grafo con audio transcrito:", graphError);
+                        await globalClient.sendMessage(jid, { text: `Entendí: "${transcribedText}". Sin embargo, hubo un problema procesando tu solicitud. ¿Podrías intentar de nuevo?` });
+                        return;
+                    }
                 } else {
                     await globalClient.sendMessage(jid, { text: "No pude entender el audio. ¿Podrías intentar enviar el mensaje de nuevo?" });
+                    return;
                 }
                 
             } catch (error) {
                 console.error("Error transcribiendo audio:", error);
                 await globalClient.sendMessage(jid, { text: "Hubo un problema procesando tu mensaje de voz. ¿Podrías escribir tu mensaje?" });
+                return;
             }}  else if (msg) {
             // El usuario envió un texto
             output = await graph.invoke({

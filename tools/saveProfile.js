@@ -13,34 +13,39 @@ const saveProfileSchema = z.object({
 
 export const saveProfile = tool(
   async (input) => {
-    let serialized = "";
-    for (const [key, value] of Object.entries(input)) {
-      // Skip undefined, null or empty strings
-      if (
-        value === undefined ||
-        value === null ||
-        (typeof value === "string" && value.trim() === "")
-      ) {
-        continue;
+    try {
+      let serialized = "";
+      for (const [key, value] of Object.entries(input)) {
+        // Skip undefined, null or empty strings
+        if (
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+        ) {
+          continue;
+        }
+        
+        // For booleans, include them even if false
+        if (typeof value === "boolean") {
+          serialized += `${key}: ${value}\n`;
+        } else if (Array.isArray(value)) {
+          // For arrays, skip if empty
+          if (value.length === 0) continue;
+          serialized += `${key}: ${JSON.stringify(value)}\n`;
+        } else if (typeof value === "object") {
+          // For objects, skip if there are no keys
+          if (Object.keys(value).length === 0) continue;
+          serialized += `${key}: ${JSON.stringify(value)}\n`;
+        } else {
+          serialized += `${key}: ${value}\n`;
+        }
       }
-      
-      // For booleans, include them even if false
-      if (typeof value === "boolean") {
-        serialized += `${key}: ${value}\n`;
-      } else if (Array.isArray(value)) {
-        // For arrays, skip if empty
-        if (value.length === 0) continue;
-        serialized += `${key}: ${JSON.stringify(value)}\n`;
-      } else if (typeof value === "object") {
-        // For objects, skip if there are no keys
-        if (Object.keys(value).length === 0) continue;
-        serialized += `${key}: ${JSON.stringify(value)}\n`;
-      } else {
-        serialized += `${key}: ${value}\n`;
-      }
-    }
 
-    return [serialized, input];
+      return [serialized, input];
+    } catch (error) {
+      console.error("Error in saveProfile tool:", error);
+      return ["Error processing profile data", {}];
+    }
   },
   {
     name: "guardar_perfil_promocion",

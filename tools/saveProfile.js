@@ -7,6 +7,7 @@ const saveProfileSchema = z.object({
   cine_destino: z.string().nullable().describe("Nombre o ubicación del cine Cinépolis al que van"),
   tipo_promocion: z.enum(["dulceria", "taquilla"]).nullable().describe("Tipo de promoción deseada: dulcería o taquilla"),
   zona_cine: z.string().nullable().describe("Zona o área del cine para validar promociones disponibles"),
+  cantidad_promociones: z.number().min(0).max(2).nullable().describe("Cantidad de promociones que ha recibido el usuario (máximo 2)"),
   notas_adicionales: z.string().nullable().describe("Cualquier información adicional de la conversación")
 });
 
@@ -43,7 +44,7 @@ export const saveProfile = tool(
   },
   {
     name: "guardar_perfil_promocion",
-    description: "Guarda información del perfil del usuario durante la conversación para ofrecerle promociones de Cinépolis. Incluye datos sobre términos aceptados, número de personas, cine de destino y tipo de promoción deseada.",
+    description: "Guarda información del perfil del usuario durante la conversación para ofrecerle promociones de Cinépolis. Incluye datos sobre términos aceptados, número de personas, cine de destino, tipo de promoción deseada y contador de promociones entregadas (máximo 2). IMPORTANTE: Si el usuario ya tiene 2 promociones y empieza a hablar de una nueva, debe limpiar los datos de la promoción anterior pero mantener la cantidad.",
     schema: saveProfileSchema,
     responseFormat: "content_and_artifact",
   }

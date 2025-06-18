@@ -1,13 +1,25 @@
 import dotenv from 'dotenv';
 import PQueue from 'p-queue';
+import * as fs from 'fs'
 import PromptBuilder from './prompt.js';
-import fs from 'fs/promises';
-import makeWASocket, { DisconnectReason, BufferJSON, useMultiFileAuthState, delay, getContentType } from '@whiskeysockets/baileys';
+
+import makeWASocket, { DisconnectReason, BufferJSON, useMultiFileAuthState, delay, getContentType, downloadMediaMessage } from '@whiskeysockets/baileys';
 import { isAIMessage } from '@langchain/core/messages';
 import { QR_PROMOTIONS } from './promotions.js';
 import graph from './graph.js';
 dotenv.config();
+import { OpenAIWhisperAudio } from "@langchain/community/document_loaders/fs/openai_whisper_audio";
+import path from 'path';
+import { fileURLToPath } from 'url';
+// Configuración para usar __dirname en ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Crear directorio temporal para archivos de audio si no existe
+const tempAudioDir = path.join(__dirname, '../tmp/audio');
+if (!fs.existsSync(tempAudioDir)) {
+    fs.mkdirSync(tempAudioDir, { recursive: true });
+}
 // Initialize state and auth
 const { state, saveCreds } = await useMultiFileAuthState('store_wa-session');
 
@@ -107,7 +119,47 @@ const proc = async m => {
         if (messageType === 'imageMessage') {
             await globalClient.sendMessage(jid, { text: "No puedo procesar imágenes, por favor envíame un mensaje de texto." });
             return;
-        } else if (msg) {
+        }else if (messageType === 'audioMessage') {
+            // Transcripción de audio usando openAI y enviando el mensaje transcrito al grafo
+            try {
+                
+                // Descargar el archivo de audio
+                const mediaBuffer = await downloadMediaMessage(m.messages[0], 'buffer');
+                
+                // Crear un archivo temporal para el audio
+                const tempFileName = `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.ogg`;
+                const tempFilePath = path.join(tempAudioDir, tempFileName);
+                
+                // Guardar el buffer como archivo temporal
+                fs.writeFileSync(tempFilePath, mediaBuffer);
+                
+                // Crear el loader de OpenAI Whisper
+                const loader = new OpenAIWhisperAudio(tempFilePath, {
+                });
+                
+                // Realizar la transcripción
+                const docs = await loader.load();
+                const transcribedText = docs[0]?.pageContent || "";
+                
+                // Limpiar el archivo temporal
+                fs.unlinkSync(tempFilePath);
+                
+                if (transcribedText.trim()) {
+                    // Enviar el mensaje transcrito al grafo
+                    output = await graph.invoke({
+                        jid,
+                        messages: [{ role: "user", content: transcribedText }]
+                    }, {
+                        configurable: { thread_id: jid }
+                    });
+                } else {
+                    await globalClient.sendMessage(jid, { text: "No pude entender el audio. ¿Podrías intentar enviar el mensaje de nuevo?" });
+                }
+                
+            } catch (error) {
+                console.error("Error transcribiendo audio:", error);
+                await globalClient.sendMessage(jid, { text: "Hubo un problema procesando tu mensaje de voz. ¿Podrías escribir tu mensaje?" });
+            }}  else if (msg) {
             // El usuario envió un texto
             output = await graph.invoke({
                 jid,

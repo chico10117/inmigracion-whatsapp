@@ -12,7 +12,7 @@ const PROMOTIONS = {
       "PrecioFull": 184,
       "PorcentajeDescuento": -0.5,
       "PrecioDescuento": 92,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 Frappes x $120",
@@ -26,7 +26,7 @@ const PROMOTIONS = {
       "PrecioFull": 184,
       "PorcentajeDescuento": -0.34782608695652173,
       "PrecioDescuento": 120,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Maxicombo Micha Mix x $340",
@@ -40,7 +40,7 @@ const PROMOTIONS = {
       "PrecioFull": 486,
       "PorcentajeDescuento": -0.3004115226337448,
       "PrecioDescuento": 340,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo bagui en pareja x $319",
@@ -54,7 +54,7 @@ const PROMOTIONS = {
       "PrecioFull": 478,
       "PorcentajeDescuento": -0.33263598326359833,
       "PrecioDescuento": 319,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 2",
@@ -68,7 +68,7 @@ const PROMOTIONS = {
       "PrecioFull": 433,
       "PorcentajeDescuento": -0.24480369515011546,
       "PrecioDescuento": 327,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 3",
@@ -82,7 +82,7 @@ const PROMOTIONS = {
       "PrecioFull": 533,
       "PorcentajeDescuento": -0.1838649155722326,
       "PrecioDescuento": 435,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 M&Ms Mega x $85",
@@ -96,7 +96,7 @@ const PROMOTIONS = {
       "PrecioFull": 170,
       "PorcentajeDescuento": -0.5,
       "PrecioDescuento": 85,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 baguis x $150",
@@ -110,7 +110,7 @@ const PROMOTIONS = {
       "PrecioFull": 280,
       "PorcentajeDescuento": -0.4642857142857143,
       "PrecioDescuento": 150,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Maxicombo Familiar x $320",
@@ -124,7 +124,7 @@ const PROMOTIONS = {
       "PrecioFull": 463,
       "PorcentajeDescuento": -0.3088552915766739,
       "PrecioDescuento": 320,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo crepa en pareja x $260",
@@ -138,7 +138,7 @@ const PROMOTIONS = {
       "PrecioFull": 320,
       "PorcentajeDescuento": -0.1875,
       "PrecioDescuento": 260,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 2",
@@ -152,7 +152,7 @@ const PROMOTIONS = {
       "PrecioFull": 433,
       "PorcentajeDescuento": -0.24480369515011546,
       "PrecioDescuento": 327,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 3",
@@ -166,7 +166,7 @@ const PROMOTIONS = {
       "PrecioFull": 533,
       "PorcentajeDescuento": -0.1838649155722326,
       "PrecioDescuento": 435,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Palomitas para llevar mantequilla x $65",
@@ -180,7 +180,7 @@ const PROMOTIONS = {
       "PrecioFull": 110,
       "PorcentajeDescuento": -0.40909090909090906,
       "PrecioDescuento": 65,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 Frappes x $120",
@@ -194,7 +194,7 @@ const PROMOTIONS = {
       "PrecioFull": 184,
       "PorcentajeDescuento": -0.34782608695652173,
       "PrecioDescuento": 120,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Maxicombo Micha Mix x $340",
@@ -208,7 +208,7 @@ const PROMOTIONS = {
       "PrecioFull": 486,
       "PorcentajeDescuento": -0.3004115226337448,
       "PrecioDescuento": 340,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo bagui en pareja x $319",
@@ -222,7 +222,7 @@ const PROMOTIONS = {
       "PrecioFull": 478,
       "PorcentajeDescuento": -0.33263598326359833,
       "PrecioDescuento": 319,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 2",
@@ -236,7 +236,7 @@ const PROMOTIONS = {
       "PrecioFull": 433,
       "PorcentajeDescuento": -0.24480369515011546,
       "PrecioDescuento": 327,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Comboleto 3",
@@ -250,7 +250,7 @@ const PROMOTIONS = {
       "PrecioFull": 533,
       "PorcentajeDescuento": -0.1838649155722326,
       "PrecioDescuento": 435,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 ICEE x $130",
@@ -264,7 +264,7 @@ const PROMOTIONS = {
       "PrecioFull": 204,
       "PorcentajeDescuento": -0.36274509803921573,
       "PrecioDescuento": 130,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 baguis x $150",
@@ -278,7 +278,7 @@ const PROMOTIONS = {
       "PrecioFull": 280,
       "PorcentajeDescuento": -0.4642857142857143,
       "PrecioDescuento": 150,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Maxicombo Familiar x $320",
@@ -292,7 +292,7 @@ const PROMOTIONS = {
       "PrecioFull": 463,
       "PorcentajeDescuento": -0.3088552915766739,
       "PrecioDescuento": 320,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo crepa en pareja x $260",
@@ -306,7 +306,7 @@ const PROMOTIONS = {
       "PrecioFull": 320,
       "PorcentajeDescuento": -0.1875,
       "PrecioDescuento": 260,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 M&Ms Mega x $85",
@@ -320,7 +320,7 @@ const PROMOTIONS = {
       "PrecioFull": 170,
       "PorcentajeDescuento": -0.5,
       "PrecioDescuento": 85,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 Frappes x $135",
@@ -334,7 +334,7 @@ const PROMOTIONS = {
       "PrecioFull": 194,
       "PorcentajeDescuento": -0.3041237113402062,
       "PrecioDescuento": 135,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo bagui en pareja x $329",
@@ -348,7 +348,7 @@ const PROMOTIONS = {
       "PrecioFull": 498,
       "PorcentajeDescuento": -0.3393574297188755,
       "PrecioDescuento": 329,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Palomitas para llevar mantequilla x $65",
@@ -362,7 +362,7 @@ const PROMOTIONS = {
       "PrecioFull": 110,
       "PorcentajeDescuento": -0.40909090909090906,
       "PrecioDescuento": 65,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "2 baguis x $150",
@@ -376,7 +376,7 @@ const PROMOTIONS = {
       "PrecioFull": 280,
       "PorcentajeDescuento": -0.4642857142857143,
       "PrecioDescuento": 150,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     },
     {
       "Promocion": "Combo crepa en pareja x $279",
@@ -390,7 +390,7 @@ const PROMOTIONS = {
       "PrecioFull": 352,
       "PorcentajeDescuento": -0.20738636363636365,
       "PrecioDescuento": 279,
-      "CinesTexto": "Todos los conjuntos, excepto formato VIP."
+      "RestriccionCine": "Todos los Cines, excepto formato VIP."
     }
   ],
   "promocionesTaquilla": [

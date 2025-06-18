@@ -70,7 +70,7 @@ const USER_PROFILE_TEMPLATE = ChatPromptTemplate.fromMessages([
       6. TU TRABAJO ES OBTENER DATOS DEL USUARIO NUNCA RECOMIENDES UNA PROMOCION.
       7. GESTIÓN DE PROMOCIONES: Máximo 2 promociones por usuario. Siempre incrementa cantidad_promociones cuando el usuario reciba una promoción. Si ya tiene 2, informa que ha alcanzado el límite.
       8. Si el usuario ya recibió 2 promociones y habla de una nueva, mantén cantidad_promociones pero limpia los otros datos de promoción.
-    
+      9. Las promos ya enviadas no pueden ser cambiadas
 
       2. Si el usuario ya recibió un QR y sigue hablando de la misma promoción:
 
@@ -105,7 +105,8 @@ Formato de respuesta:
 - No uses paréntesis. No devuelvas markdown. Solo JSON puro y correctamente indentado.
 - DEVUELVE SIEMPRE UN JSON VÁLIDO, SIN EXCEPCIONES.
 
-Aquí tienes el estado actual del perfil del usuario: {user_profile}`
+Aquí tienes el estado actual del perfil del usuario: {user_profile}
+Promociones entregadas: {cantidad_promociones}/2`
     ],
     ["placeholder", `{messages}`]
 ]);
@@ -125,6 +126,10 @@ const PromotionAnnotation = Annotation({
 const CustomStateAnnotation = Annotation.Root({
     user_profile: UserProfileAnnotation,
     promotion: PromotionAnnotation,
+    cantidad_promociones: Annotation({
+        reducer: (current, update) => update ?? current ?? 0,
+        default: () => 0
+    }),
     qr_code: Annotation(),
     next: Annotation(),
     ...MessagesAnnotation.spec
@@ -245,15 +250,39 @@ async function responderConResultados(state) {
     if (state.promotion) {
         // si hay promoción
     const qrMSG = (state.promotion.promocion)?`,{ "image": { "url": "${qrCode}", "caption": "Escanea este QR para canjear tu promoción" } }`: "";    
-    const AiMessage = new AIMessage(`{"messages":[{ "text": "${state.promotion.text}" } ${qrMSG}]}`);
-    const SystemMessage = new AIMessage(`Hasta este momento ya el usuario ha recibido una promocion, ten en cuenta esto para recibir una nueva promoción`);
-    const result = {
-        messages: [SystemMessage, AiMessage],
-    };
-    console.log("Nodo: responderConResultados - result:", result);
-    state.promotion = (state.promotion.promocion) ? state.promotion:null;
-
-    return result;
+    const aiMessage = new AIMessage(`{"messages":[{ "text": "${state.promotion.text}" } ${qrMSG}]}`);
+    
+    const messages = [aiMessage];
+    
+    // Solo agregar systemMessage si hay promoción válida
+    if (state.promotion.promocion) {
+        const systemMessage = new SystemMessage(`Hasta este momento ya el usuario ha recibido una promocion, los datos en el historico sobre el usuario deben ignorarse y preguntar los nuevos de aqui en adelante.`);
+        messages.unshift(systemMessage); // Agregar al inicio del array
+    }
+    
+    // Solo limpiar el estado si hay una promoción válida
+    if (state.promotion.promocion) {
+        const result = {
+            messages: messages,
+            promotion: null,
+            user_profile: {
+                numero_personas: null,
+                cine_destino: null,
+                tipo_promocion: null,
+                zona_cine: null,
+            },
+            cantidad_promociones: state.cantidad_promociones + 1
+        };
+        console.log("Nodo: responderConResultados - result:", result);
+        return result;
+    } else {
+        // Si no hay promoción válida, mantener el estado como está
+        const result = {
+            messages: messages,
+        };
+        console.log("Nodo: responderConResultados - result:", result);
+        return result;
+    }
     }
     // Si no hay promoción, respondemos con un mensaje genérico
     const response = new AIMessage(`{ "text": "Lo siento, no tengo una promoción adecuada para ti en este momento." }`);

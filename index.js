@@ -268,13 +268,11 @@ async function connectToWhatsApp() {
     globalClient.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            if (qr_enabled) {
-                console.log('📱 QR Code generado! Escanéalo con tu WhatsApp:');
-                console.log('═'.repeat(50));
-                qrcode.generate(qr, { small: true });
-                console.log('═'.repeat(50));
-                console.log('💡 Abre WhatsApp > Configuración > Dispositivos vinculados > Vincular dispositivo');
-            }
+            console.log('📱 QR Code generado! Escanéalo con tu WhatsApp:');
+            console.log('═'.repeat(50));
+            qrcode.generate(qr, { small: true });
+            console.log('═'.repeat(50));
+            console.log('💡 Abre WhatsApp > Configuración > Dispositivos vinculados > Vincular dispositivo');
         }
         if (connection === 'close') {
             if (lastDisconnect?.error?.output?.statusCode !== 401) {

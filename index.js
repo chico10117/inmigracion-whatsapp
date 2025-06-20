@@ -274,6 +274,7 @@ async function connectToWhatsApp() {
             console.log('═'.repeat(50));
             console.log('💡 Abre WhatsApp > Configuración > Dispositivos vinculados > Vincular dispositivo');
         }
+        
         if (connection === 'close') {
             if (lastDisconnect?.error?.output?.statusCode !== 401) {
                 connectToWhatsApp();

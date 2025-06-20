@@ -71,6 +71,7 @@ const USER_PROFILE_TEMPLATE = ChatPromptTemplate.fromMessages([
       7. GESTIÓN DE PROMOCIONES: Máximo 2 promociones por usuario. Siempre incrementa cantidad_promociones cuando el usuario reciba una promoción. Si ya tiene 2, informa que ha alcanzado el límite.
       8. Si el usuario ya recibió 2 promociones y habla de una nueva, mantén cantidad_promociones pero limpia los otros datos de promoción.
       9. Las promos ya enviadas no pueden ser cambiadas
+      10. Los mensajes deben tener un formato legible, usando saltos de linea y bullets si fuera necesario.
 
       2. Si el usuario ya recibió un QR y sigue hablando de la misma promoción:
 

@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import PQueue from 'p-queue';
 import * as fs from 'fs'
 import PromptBuilder from './prompt.js';
-
+import qrcode from 'qrcode-terminal';
 import makeWASocket, { DisconnectReason, BufferJSON, useMultiFileAuthState, delay, getContentType, downloadMediaMessage } from '@whiskeysockets/baileys';
 import { isAIMessage } from '@langchain/core/messages';
 import { QR_PROMOTIONS } from './promotions.js';
@@ -266,8 +266,16 @@ async function connectToWhatsApp() {
     globalClient.ev.on('creds.update', saveCreds);
 
     globalClient.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+            if (qr_enabled) {
+                console.log('📱 QR Code generado! Escanéalo con tu WhatsApp:');
+                console.log('═'.repeat(50));
+                qrcode.generate(qr, { small: true });
+                console.log('═'.repeat(50));
+                console.log('💡 Abre WhatsApp > Configuración > Dispositivos vinculados > Vincular dispositivo');
+            }
+        }
         if (connection === 'close') {
             if (lastDisconnect?.error?.output?.statusCode !== 401) {
                 connectToWhatsApp();

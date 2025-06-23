@@ -73,7 +73,6 @@ const USER_PROFILE_TEMPLATE = ChatPromptTemplate.fromMessages([
       9. Las promos ya enviadas no pueden ser cambiadas
       10. Los mensajes deben tener un formato legible, usando saltos de linea y bullets si fuera necesario.
       11. Mantener la conversación relacionado solo a las promociones de Cinépolis, si el usaurio pregunta por cualquier otra cosa, dar una respuesta corta y repetitiva informando que no se puede ayudar con eso.
-      12. Ten en cuenta las fechas de las promociones para poder ofrecerlas, hoy es ${new Date().toLocaleDateString("es-MX", { year: 'numeric', month: '2-digit', day: '2-digit' })}, pudes ofrecer promociones una semana antes de la fecha de inicio pero nunca despues de la fecha de finalizacion.
       
       B. Si el usuario ya recibió un QR y sigue hablando de la misma promoción:
          - Responde con el QR nuevamente.
@@ -202,9 +201,11 @@ async function buscar(state) {
     const prompt = `
    
     Utiliza exclusivamente los datos del perfil proporcionado a continuación y responde en formato JSON la promocion que mejor se corresponde al usuario.
-    ten en cuenta que la promoción debe ser acorde a los cines relacionados al usuario, 
+    ten en cuenta que la promoción debe ser acorde a los cines relacionados al usuario.
     Debe validarse el número de personas con las que ofrece las promociones en PersonasObjetivo, y el tipo de promoción deseada.
-     Si no hay una promoción adecuada,
+    Siempre que hay varias opciones aceptables, escoge la promoción que mayor beneficio le ofreza a cinepolis , la de mas ingresos.
+    No tengas en cuenta las fechas de caducidad de las promociones. Asume que todas están vigentes.
+    Si no hay una promoción adecuada,
     responde con un: 
     {{
     "promocion": null,

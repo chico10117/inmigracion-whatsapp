@@ -109,6 +109,7 @@ Formato de respuesta:
 - DEVUELVE SIEMPRE UN JSON VÁLIDO, SIN EXCEPCIONES.
 
 Aquí tienes el estado actual del perfil del usuario: {user_profile}
+El nombre de usuario es: {username}
 Promociones entregadas: {cantidad_promociones}/2`
     ],
     ["placeholder", `{messages}`]
@@ -133,6 +134,7 @@ const CustomStateAnnotation = Annotation.Root({
         reducer: (current, update) => update ?? current ?? 0,
         default: () => 0
     }),
+    username: Annotation(),
     qr_code: Annotation(),
     next: Annotation(),
     ...MessagesAnnotation.spec

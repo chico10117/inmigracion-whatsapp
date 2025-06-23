@@ -104,6 +104,7 @@ const proc = async m => {
     const msg = m.messages[0].message?.conversation || m.messages[0].message?.extendedTextMessage?.text || m.messages[0].message?.imageMessage?.caption
     const replyMsg = m.messages[0].message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || m.messages[0].message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage?.caption || null
     console.log(m.messages[0])
+    const nombreUsuario = m.messages[0].pushName || 'Nombre Desconocido';
     try {
         const jid = m.messages[0].key.remoteJid
         const mKey = m.messages[0].key
@@ -152,6 +153,7 @@ const proc = async m => {
                     try {
                         output = await graph.invoke({
                             jid,
+                            username: nombreUsuario,
                             messages: [{ role: "user", content: transcribedText }]
                         }, {
                             configurable: { thread_id: jid }
@@ -174,6 +176,7 @@ const proc = async m => {
             // El usuario envió un texto
             output = await graph.invoke({
                 jid,
+                username: nombreUsuario,
                 messages: [{ role: "user", content: msg }]
             }, {
                 configurable: { thread_id: jid }

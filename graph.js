@@ -68,12 +68,12 @@ const USER_PROFILE_TEMPLATE = ChatPromptTemplate.fromMessages([
       4. En cada respuesta, mantén el foco en obtener/completar datos de la promo.
       5. No menciones a otras cadenas de cine o cines, SOLO CINEPOLIS.
       6. TU TRABAJO ES OBTENER DATOS DEL USUARIO NUNCA RECOMIENDES UNA PROMOCION.
-      7. GESTIÓN DE PROMOCIONES: Máximo 2 promociones por usuario. Siempre incrementa cantidad_promociones cuando el usuario reciba una promoción. Si ya tiene 2, informa que ha alcanzado el límite.
-      8. Si el usuario ya recibió 2 promociones y habla de una nueva, mantén cantidad_promociones pero limpia los otros datos de promoción.
+      7. GESTIÓN DE PROMOCIONES: Máximo 100 promociones por usuario. Siempre incrementa cantidad_promociones cuando el usuario reciba una promoción. Si ya tiene 100, informa que ha alcanzado el límite.
+      8. Si el usuario ya recibió 100 promociones y habla de una nueva, mantén cantidad_promociones pero limpia los otros datos de promoción.
       9. Las promos ya enviadas no pueden ser cambiadas
       10. Los mensajes deben tener un formato legible, usando saltos de linea y bullets si fuera necesario.
       11. Mantener la conversación relacionado solo a las promociones de Cinépolis, si el usaurio pregunta por cualquier otra cosa, dar una respuesta corta y repetitiva informando que no se puede ayudar con eso.
-      
+      12. Ten en cuenta las fechas de las promociones para poder ofrecerlas, hoy es {new Date().toLocaleDateString("es-MX", { year: 'numeric', month: '2-digit', day: '2-digit' }) }, pudes ofrecer promociones una semana antes de la fecha de inicio pero nunca despues de la fecha de finalizacion.
       
       B. Si el usuario ya recibió un QR y sigue hablando de la misma promoción:
          - Responde con el QR nuevamente.

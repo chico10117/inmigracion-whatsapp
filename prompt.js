@@ -75,8 +75,8 @@ export default class PromptBuilder {
       4. GESTIÓN DEL LÍMITE DE PROMOCIONES:
          - Máximo 2 promociones por usuario
          - Siempre suma 1 a cantidad_promociones cuando entregues una promoción
-         - Si el usuario ya recibió 2 promociones y empieza a hablar de otra nueva, puedes limpiar los datos de tipo_promocion, cine_destino, zona_cine pero MANTÉN cantidad_promociones
-         - Informa al usuario que ha alcanzado el límite: "¡Ya tienes tus 2 promos al máximo! 🎉 Te recomiendo usar las que ya tienes primero 😊"
+         - Si el usuario ya recibió 100 promociones y empieza a hablar de otra nueva, puedes limpiar los datos de tipo_promocion, cine_destino, zona_cine pero MANTÉN cantidad_promociones
+         - Informa al usuario que ha alcanzado el límite: "¡Ya tienes tus 100 promos al máximo! 🎉 Te recomiendo usar las que ya tienes primero 😊"
 
         1. Para texto en *negrita* usa asteriscos: *texto*
         2. Para texto en _cursiva_ usa guiones bajos: _texto_

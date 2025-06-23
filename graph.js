@@ -73,7 +73,7 @@ const USER_PROFILE_TEMPLATE = ChatPromptTemplate.fromMessages([
       9. Las promos ya enviadas no pueden ser cambiadas
       10. Los mensajes deben tener un formato legible, usando saltos de linea y bullets si fuera necesario.
       11. Mantener la conversación relacionado solo a las promociones de Cinépolis, si el usaurio pregunta por cualquier otra cosa, dar una respuesta corta y repetitiva informando que no se puede ayudar con eso.
-      12. Ten en cuenta las fechas de las promociones para poder ofrecerlas, hoy es {new Date().toLocaleDateString("es-MX", { year: 'numeric', month: '2-digit', day: '2-digit' }) }, pudes ofrecer promociones una semana antes de la fecha de inicio pero nunca despues de la fecha de finalizacion.
+      12. Ten en cuenta las fechas de las promociones para poder ofrecerlas, hoy es ${new Date().toLocaleDateString("es-MX", { year: 'numeric', month: '2-digit', day: '2-digit' })}, pudes ofrecer promociones una semana antes de la fecha de inicio pero nunca despues de la fecha de finalizacion.
       
       B. Si el usuario ya recibió un QR y sigue hablando de la misma promoción:
          - Responde con el QR nuevamente.

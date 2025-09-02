@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { estimateCostCents } from '../domain/calc'
+import { estimateCostCents, calculateAccurateCost, UsageDetails } from '../domain/calc'
 import { logger } from '../utils/logger'
 import { SearchHandler, SEARCH_FUNCTION_DEFINITION, SearchHandlerResult } from './search-handler'
 
@@ -43,7 +43,11 @@ export interface OpenAIResponse {
     prompt_tokens: number
     completion_tokens: number
     total_tokens: number
+    input_tokens: number
+    cached_tokens: number
+    output_tokens: number
   }
+  cost_details: UsageDetails
   cost_cents: number
   search_used: boolean
   search_cost_cents: number
@@ -179,33 +183,47 @@ export async function askImmigrationQuestion(
     const usage = response.usage ?? { 
       prompt_tokens: 0, 
       completion_tokens: 0, 
-      total_tokens: 0 
+      total_tokens: 0,
+      input_tokens: 0,
+      input_tokens_details: { cached_tokens: 0 },
+      output_tokens: 0
     }
 
-    const openaiCostCents = estimateCostCents({
-      prompt_tokens: usage.prompt_tokens,
-      completion_tokens: usage.completion_tokens
+    // Calculate accurate cost using GPT-4.1 pricing
+    const costDetails = calculateAccurateCost(model, {
+      input_tokens: usage.input_tokens || usage.prompt_tokens,
+      input_tokens_details: { cached_tokens: usage.input_tokens_details?.cached_tokens || 0 },
+      output_tokens: usage.output_tokens || usage.completion_tokens
     })
 
-    const totalCostCents = openaiCostCents + totalSearchCost
+    const totalCostCents = costDetails.cost_eur_cents + totalSearchCost
 
     logger.info({ 
+      model,
       tokens: usage.total_tokens, 
-      openaiCostCents,
+      inputTokens: costDetails.input_tokens,
+      cachedTokens: costDetails.cached_tokens,
+      outputTokens: costDetails.output_tokens,
+      openaiCostUsd: costDetails.cost_usd,
+      openaiCostCents: costDetails.cost_eur_cents,
       searchCostCents: totalSearchCost,
       totalCostCents,
       searchUsed: Boolean(searchResult),
       sourcesFound: allSources.length,
       responseLength: finalResponse.length 
-    }, 'Immigration question processed')
+    }, 'Immigration question processed with accurate pricing')
 
     return {
       text: finalResponse,
       usage: {
         prompt_tokens: usage.prompt_tokens,
         completion_tokens: usage.completion_tokens,
-        total_tokens: usage.total_tokens
+        total_tokens: usage.total_tokens,
+        input_tokens: costDetails.input_tokens,
+        cached_tokens: costDetails.cached_tokens,
+        output_tokens: costDetails.output_tokens
       },
+      cost_details: costDetails,
       cost_cents: totalCostCents,
       search_used: Boolean(searchResult),
       search_cost_cents: totalSearchCost,
@@ -216,9 +234,22 @@ export async function askImmigrationQuestion(
     logger.error({ error }, 'Error calling OpenAI API')
     
     // Provide fallback response for better UX
+    const fallbackCostDetails = calculateAccurateCost(process.env.OPENAI_MODEL ?? 'gpt-4.1', {
+      input_tokens: 0,
+      output_tokens: 0
+    })
+    
     return {
       text: 'Lo siento, tengo dificultades técnicas en este momento. Por favor, intenta de nuevo en unos minutos o contacta con un profesional para consultas urgentes.',
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      usage: { 
+        prompt_tokens: 0, 
+        completion_tokens: 0, 
+        total_tokens: 0,
+        input_tokens: 0,
+        cached_tokens: 0,
+        output_tokens: 0
+      },
+      cost_details: fallbackCostDetails,
       cost_cents: 0,
       search_used: false,
       search_cost_cents: 0,

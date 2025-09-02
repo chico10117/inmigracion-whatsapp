@@ -116,6 +116,58 @@ export async function hasCredits(userId: string): Promise<boolean> {
   }
 }
 
+export async function canAfford(userId: string, costCents: number): Promise<boolean> {
+  try {
+    if (!supa || userId.startsWith('mock-')) {
+      // Find mock user by ID and check if they can afford the cost
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          return user.credits_cents >= costCents
+        }
+      }
+      return true // Default for testing
+    }
+
+    const { data } = await supa
+      .from('users')
+      .select('credits_cents')
+      .eq('id', userId)
+      .single()
+
+    return (data?.credits_cents ?? 0) >= costCents
+
+  } catch (error) {
+    logger.error({ error, userId, costCents }, 'Error checking if user can afford cost')
+    return false
+  }
+}
+
+export async function getUserCredits(userId: string): Promise<number> {
+  try {
+    if (!supa || userId.startsWith('mock-')) {
+      // Find mock user by ID and return credits
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          return user.credits_cents
+        }
+      }
+      return 300 // Default for testing
+    }
+
+    const { data } = await supa
+      .from('users')
+      .select('credits_cents')
+      .eq('id', userId)
+      .single()
+
+    return data?.credits_cents ?? 0
+
+  } catch (error) {
+    logger.error({ error, userId }, 'Error getting user credits')
+    return 0
+  }
+}
+
 export async function debitCredits(
   userId: string, 
   costCents: number, 

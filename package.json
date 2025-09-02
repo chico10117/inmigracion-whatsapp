@@ -12,7 +12,8 @@
     "test:openai": "ts-node scripts/test-openai.ts",
     "test:whatsapp": "ts-node scripts/test-whatsapp.ts",
     "test:search": "ts-node scripts/test-search.ts",
-    "test:web-search": "ts-node scripts/test-web-search.ts"
+    "test:web-search": "ts-node scripts/test-web-search.ts",
+    "test:pricing": "ts-node scripts/test-accurate-pricing.ts"
   },
   "keywords": [
     "whatsapp",

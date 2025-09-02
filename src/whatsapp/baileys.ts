@@ -9,7 +9,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom'
 import * as qrcode from 'qrcode-terminal'
 import { logger } from '../utils/logger'
-import { ensureUser, hasCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction } from '../domain/credit'
+import { ensureUser, hasCredits, canAfford, getUserCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction } from '../domain/credit'
 import { askImmigrationQuestion, ConversationMessage } from '../llm/openai'
 import { isContentAppropriate } from '../llm/moderation'
 import { MESSAGES, COMMANDS } from '../domain/flows'
@@ -235,12 +235,24 @@ export class WhatsAppBot {
       
       await this.sendMessage(jid, response.text)
       
+      // Get final user credits after debit
+      const finalCredits = await getUserCredits(user.id)
+      
       logger.info({ 
         phoneE164,
+        model: process.env.OPENAI_MODEL,
         tokens: response.usage.total_tokens,
+        inputTokens: response.usage.input_tokens,
+        cachedTokens: response.usage.cached_tokens,
+        outputTokens: response.usage.output_tokens,
+        costUsd: response.cost_details.cost_usd,
         costCents: response.cost_cents,
-        conversationLength: conversationHistory.length
-      }, 'Immigration question processed successfully')
+        searchCostCents: response.search_cost_cents,
+        searchUsed: response.search_used,
+        conversationLength: conversationHistory.length,
+        finalCreditsEurCents: finalCredits,
+        finalCreditsEur: (finalCredits / 100).toFixed(2)
+      }, 'Immigration question processed with accurate cost tracking')
 
     } catch (error) {
       logger.error({ error, phoneE164 }, 'Error processing immigration question')

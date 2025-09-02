@@ -1,35 +1,32 @@
 {
-  "name": "chatbotbios",
+  "name": "reco-extranjeria",
   "version": "1.0.0",
-  "description": "Este proyecto es un chatbot para WhatsApp que utiliza la API de WhatsApp Web para interactuar con los usuarios.",
-  "main": "index.js",
-  "type": "module",
+  "description": "MVP Chatbot de WhatsApp para consultas de inmigración en España",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
+  "keywords": ["whatsapp", "chatbot", "immigration", "spain"],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@langchain/community": "^0.3.46",
-    "@langchain/core": "^0.3.59",
-    "@langchain/langgraph": "^0.3.4",
-    "@langchain/openai": "^0.5.13",
-    "@mendable/firecrawl-js": "^1.16.0",
-    "@whiskeysockets/baileys": "^6.7.13",
-    "cheerio": "^1.0.0",
-    "dotenv": "^16.4.7",
-    "langchain": "^0.3.28",
-    "lodash": "^4.17.21",
-    "lowdb": "^7.0.1",
-    "minisearch": "^1.1.0",
-    "node-cron": "^3.0.3",
-    "node-fetch": "^3.3.2",
-    "node-wit": "^6.6.0",
-    "openai": "^4.77.0",
-    "p-queue": "^8.1.0",
-    "puppeteer": "^24.2.0",
-    "qrcode-terminal": "^0.12.0"
+    "@whiskeysockets/baileys": "^6.7.0",
+    "openai": "^4.65.0",
+    "stripe": "^14.21.0",
+    "@supabase/supabase-js": "^2.43.2",
+    "express": "^4.19.2",
+    "zod": "^3.22.4",
+    "pino": "^8.19.0",
+    "dotenv": "^16.4.5"
   },
-  "keywords": []
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "ts-node-dev": "^2.0.0",
+    "@types/node": "^20.12.7",
+    "@types/express": "^4.17.21"
+  }
 }

@@ -1,8 +1,0 @@
-services:
-  app:
-    image: node:20
-    working_dir: /usr/src/app
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules # Evita conflictos si los módulos ya existen
-    command: sh -c "npm install && npm start"

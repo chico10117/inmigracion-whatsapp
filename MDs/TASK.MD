@@ -88,6 +88,16 @@ Implementar un chatbot de WhatsApp para consultas de inmigración con sistema de
 - [x] Implementar fallback graceful sin API de búsqueda
 - [x] Crear tests comprehensivos para funcionalidad de búsqueda
 
+### 12. Gestión de Conversaciones y Contexto ✅
+- [x] Implementar almacenamiento de historial de conversaciones en memoria
+- [x] Crear sistema de gestión de mensajes (usuario y asistente)
+- [x] Añadir timeout automático de conversaciones (30 minutos)
+- [x] Limitar historial a 20 mensajes para evitar overflow de tokens
+- [x] Integrar contexto de conversación en llamadas a OpenAI
+- [x] Limpiar historial al ejecutar comando "BAJA"
+- [x] Mejorar seguimiento de primera interacción de usuarios
+- [x] Restricción de acceso a número específico (+34686468168)
+
 ---
 
 ## 🔧 Configuración de Stripe

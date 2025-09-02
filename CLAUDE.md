@@ -17,13 +17,14 @@ This is a WhatsApp chatbot for immigration consultations in Spain ("Reco Extranj
 ### Core Files
 - **src/index.ts**: Main entry point - initializes server and WhatsApp connection
 - **src/server.ts**: Express server for health checks and Stripe webhooks
-- **src/whatsapp/baileys.ts**: WhatsApp message handling and bot logic
-- **src/llm/openai.ts**: OpenAI GPT-4.1 integration with function calling for search
+- **src/whatsapp/baileys.ts**: WhatsApp message handling and bot logic with conversation context
+- **src/llm/openai.ts**: OpenAI GPT-4.1 integration with function calling for search and conversation history
 - **src/llm/perplexity.ts**: Perplexity API client for real-time web search
 - **src/llm/search-handler.ts**: Search function handler with caching system
 - **src/llm/moderation.ts**: Content moderation using OpenAI's moderation API
 - **src/billing/stripe.ts**: Stripe webhook handler for payment processing
-- **src/domain/credit.ts**: Credit management and user balance operations
+- **src/domain/conversation.ts**: Conversation history management with 30-minute timeout
+- **src/domain/credit.ts**: Credit management and user balance operations with first interaction tracking
 - **src/domain/calc.ts**: Token cost calculation (USD to EUR conversion)
 - **src/domain/flows.ts**: Message templates and user-facing copy
 - **src/db/supabase.ts**: Database client configuration
@@ -95,14 +96,16 @@ BOT_INIT_CREDITS_CENTS=300  # €3 initial credit
 ### Message Processing Flow
 1. User sends message via WhatsApp
 2. Bot checks/creates user with €3 initial credit (first time only)
-3. Content moderation check - blocks inappropriate content
-4. Credit check - sends payment links if balance is 0
-5. GPT-4.1 processes immigration query with system prompt
-6. **AI decides if web search is needed** (for current info, law changes, processing times)
-7. If search needed: Perplexity API searches Spanish government sources
-8. Combined response using both static knowledge and real-time information
-9. Total cost calculated (OpenAI + search) and debited from user credits
-10. Response sent back to user via WhatsApp with sources when applicable
+3. **Message added to conversation history** (up to 20 messages, 30-minute timeout)
+4. Content moderation check - blocks inappropriate content
+5. Credit check - sends payment links if balance is 0
+6. **Full conversation context** sent to GPT-4.1 with system prompt
+7. **AI decides if web search is needed** (for current info, law changes, processing times)
+8. If search needed: Perplexity API searches Spanish government sources
+9. Combined response using both static knowledge, real-time information, and conversation context
+10. **Assistant response added to conversation history**
+11. Total cost calculated (OpenAI + search) and debited from user credits
+12. Response sent back to user via WhatsApp with sources when applicable
 
 ### Credit System
 - New users receive €3 initial credit (300 cents)
@@ -117,7 +120,15 @@ BOT_INIT_CREDITS_CENTS=300  # €3 initial credit
 - QR code authentication required on first run
 - Session persisted in `auth/` directory
 - Supports text messages only in v1
-- "BAJA" command for GDPR-compliant data deletion
+- **Conversation Context**: Maintains chat history for natural follow-up questions
+- "BAJA" command for GDPR-compliant data deletion (clears conversation history)
+
+### Conversation Management
+- **Context Retention**: Maintains up to 20 messages per conversation
+- **Auto-Timeout**: Conversations reset after 30 minutes of inactivity
+- **Follow-up Questions**: Users can ask clarifying questions without repeating context
+- **Memory Management**: Automatic pruning to prevent token overflow
+- **Privacy Compliant**: History cleared on "BAJA" command or timeout
 
 ### Real-Time Web Search
 - **Intelligent Search Decisions**: AI automatically determines when current information is needed

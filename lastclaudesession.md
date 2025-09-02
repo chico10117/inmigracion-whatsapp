@@ -94,13 +94,15 @@ Successfully transformed a legacy Cinépolis movie bot project into a functional
 
 The bot includes:
 - **Full WhatsApp Integration**: QR auth, message processing, typing indicators
+- **Conversation Context**: Maintains chat history for natural follow-up questions (30min timeout)
 - **Intelligent Responses**: Spanish immigration guidance with official source links
 - **Real-Time Web Search**: AI-powered search for current immigration information
-- **User Management**: Auto-registration with €3 welcome credit
+- **User Management**: Auto-registration with €3 welcome credit, improved first interaction tracking
 - **Safety Features**: Content moderation, appropriate disclaimers
 - **Payment System**: Ready for Stripe integration
-- **GDPR Compliance**: Data deletion on command
+- **GDPR Compliance**: Data deletion on command (includes conversation history)
 - **Cost-Effective Search**: ~€0.01 per search query with 24h caching
+- **Access Control**: Restricted to authorized phone number for testing
 
 ---
 
@@ -109,12 +111,13 @@ The bot includes:
 ### Core Implementation
 - `src/index.ts` - Main application entry point
 - `src/server.ts` - Express server with health check + webhook placeholder
-- `src/whatsapp/baileys.ts` - Complete WhatsApp bot implementation
-- `src/llm/openai.ts` - Immigration-specialized AI assistant with function calling
+- `src/whatsapp/baileys.ts` - Complete WhatsApp bot implementation with conversation context
+- `src/llm/openai.ts` - Immigration-specialized AI assistant with function calling and conversation history
 - `src/llm/perplexity.ts` - Real-time web search client
 - `src/llm/search-handler.ts` - Search function handler with caching
 - `src/llm/moderation.ts` - Content filtering system
-- `src/domain/credit.ts` - User & credit management
+- `src/domain/conversation.ts` - **NEW**: Conversation history management with timeout
+- `src/domain/credit.ts` - User & credit management with improved first interaction tracking
 - `src/domain/calc.ts` - Cost calculation (USD→EUR)
 - `src/domain/flows.ts` - Message templates & user flows
 - `src/db/supabase.ts` - Database client configuration

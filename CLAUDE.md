@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a WhatsApp chatbot for immigration consultations in Spain ("Reco Extranjería"). The bot provides informational guidance about immigration processes with a credit-based payment system. It uses:
 - **WhatsApp Web API** (@whiskeysockets/baileys) for messaging
 - **OpenAI GPT-4.1** for natural language processing and responses
+- **Perplexity API** for real-time web search of current immigration information
 - **Supabase** (PostgreSQL) for user data, credits, and conversation history
 - **Stripe Payment Links** for credit top-ups (€5/€10/€15)
 - **TypeScript** with Node.js for type-safe backend development
@@ -17,7 +18,9 @@ This is a WhatsApp chatbot for immigration consultations in Spain ("Reco Extranj
 - **src/index.ts**: Main entry point - initializes server and WhatsApp connection
 - **src/server.ts**: Express server for health checks and Stripe webhooks
 - **src/whatsapp/baileys.ts**: WhatsApp message handling and bot logic
-- **src/llm/openai.ts**: OpenAI GPT-4.1 integration for immigration questions
+- **src/llm/openai.ts**: OpenAI GPT-4.1 integration with function calling for search
+- **src/llm/perplexity.ts**: Perplexity API client for real-time web search
+- **src/llm/search-handler.ts**: Search function handler with caching system
 - **src/llm/moderation.ts**: Content moderation using OpenAI's moderation API
 - **src/billing/stripe.ts**: Stripe webhook handler for payment processing
 - **src/domain/credit.ts**: Credit management and user balance operations
@@ -51,6 +54,12 @@ npm run typecheck
 
 # Clean build directory
 npm run clean
+
+# Run tests
+npm run test:openai       # Test OpenAI integration
+npm run test:whatsapp     # Test WhatsApp components
+npm run test:search       # Test search integration
+npm run test:web-search   # Comprehensive web search test
 ```
 
 ## Environment Variables
@@ -59,7 +68,12 @@ Create a `.env` file with (see `.env.example` for full template):
 ```
 # OpenAI
 OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4.1
+OPENAI_MODEL=gpt-4-turbo
+
+# Perplexity (for real-time search)
+PERPLEXITY_API_KEY=your_perplexity_key_here
+PERPLEXITY_MODEL=llama-3.1-sonar-small-128k-online
+SEARCH_ENABLED=true
 
 # Stripe
 STRIPE_SECRET_KEY=your_stripe_secret_key
@@ -84,14 +98,18 @@ BOT_INIT_CREDITS_CENTS=300  # €3 initial credit
 3. Content moderation check - blocks inappropriate content
 4. Credit check - sends payment links if balance is 0
 5. GPT-4.1 processes immigration query with system prompt
-6. Token cost calculated and debited from user credits
-7. Response sent back to user via WhatsApp
+6. **AI decides if web search is needed** (for current info, law changes, processing times)
+7. If search needed: Perplexity API searches Spanish government sources
+8. Combined response using both static knowledge and real-time information
+9. Total cost calculated (OpenAI + search) and debited from user credits
+10. Response sent back to user via WhatsApp with sources when applicable
 
 ### Credit System
 - New users receive €3 initial credit (300 cents)
-- Cost calculated based on actual GPT-4.1 token usage
+- Cost calculated based on actual GPT-4.1 token usage + search API calls
 - USD to EUR conversion with configurable exchange rate
 - 15% margin added for infrastructure costs
+- **Search cost**: ~€0.01 per query (Perplexity API very affordable)
 - Users can top up via Stripe Payment Links (€5/€10/€15)
 
 ### WhatsApp Integration
@@ -101,12 +119,19 @@ BOT_INIT_CREDITS_CENTS=300  # €3 initial credit
 - Supports text messages only in v1
 - "BAJA" command for GDPR-compliant data deletion
 
+### Real-Time Web Search
+- **Intelligent Search Decisions**: AI automatically determines when current information is needed
+- **Spanish Government Focus**: Prioritizes official sources (extranjeria.mitramiss.gob.es, boe.es, etc.)
+- **24-Hour Caching**: Avoids repeat API calls for same queries (cost optimization)
+- **Source Attribution**: Includes official links in responses for verification
+- **Graceful Fallback**: Works without search API (static knowledge only)
+
 ### Database Schema
 - **users**: Phone number, credits, language preference
 - **conversations**: Links messages to users
-- **messages**: Stores chat history with token counts
+- **messages**: Stores chat history with token counts + search usage
 - **payments**: Stripe payment records
-- **credit_ledger**: Transaction history for audit trail
+- **credit_ledger**: Transaction history for audit trail (includes search costs)
 - **metrics_daily**: Aggregated view for analytics
 
 ## Code Conventions

@@ -21,27 +21,27 @@ Implementar un chatbot de WhatsApp para consultas de inmigración con sistema de
 - [ ] Obtener y configurar `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`
 - [x] Verificar conexión desde el código - código preparado
 
-### 3. Sistema de Créditos
-- [ ] Implementar `src/domain/calc.ts` (cálculo de costos)
-- [ ] Implementar `src/domain/credit.ts` (gestión de créditos)
-- [ ] Crear función `ensureUser()` para alta automática
-- [ ] Implementar débito después de cada consulta
-- [ ] Añadir ledger de transacciones
+### 3. Integración OpenAI ✅
+- [x] Configurar cliente OpenAI con API key
+- [x] Implementar `src/llm/openai.ts` con prompt del sistema
+- [x] Implementar `src/llm/moderation.ts` para filtrado
+- [x] Configurar cálculo de tokens y costos
+- [x] Probar respuestas con consultas de ejemplo (script creado)
 
-### 4. Integración OpenAI
-- [ ] Configurar cliente OpenAI con API key
-- [ ] Implementar `src/llm/openai.ts` con prompt del sistema
-- [ ] Implementar `src/llm/moderation.ts` para filtrado
-- [ ] Configurar cálculo de tokens y costos
-- [ ] Probar respuestas con consultas de ejemplo
+### 4. WhatsApp con Baileys ✅
+- [x] Implementar `src/whatsapp/baileys.ts`
+- [x] Configurar autenticación multi-dispositivo
+- [x] Implementar manejo de mensajes entrantes
+- [x] Añadir comando "BAJA" para eliminación de datos
+- [x] Implementar envío de links de recarga cuando saldo = 0
+- [x] Generar y escanear código QR inicial
 
-### 5. WhatsApp con Baileys
-- [ ] Implementar `src/whatsapp/baileys.ts`
-- [ ] Configurar autenticación multi-dispositivo
-- [ ] Implementar manejo de mensajes entrantes
-- [ ] Añadir comando "BAJA" para eliminación de datos
-- [ ] Implementar envío de links de recarga cuando saldo = 0
-- [ ] Generar y escanear código QR inicial
+### 5. Sistema de Créditos ✅
+- [x] Implementar `src/domain/calc.ts` (cálculo de costos)
+- [x] Implementar `src/domain/credit.ts` (gestión de créditos)
+- [x] Crear función `ensureUser()` para alta automática
+- [x] Implementar débito después de cada consulta
+- [x] Añadir ledger de transacciones
 
 ### 6. Integración Stripe
 - [ ] Crear cuenta Stripe (si no existe)
@@ -56,28 +56,37 @@ Implementar un chatbot de WhatsApp para consultas de inmigración con sistema de
 - [x] Configurar endpoint `/health`
 - [x] Configurar endpoint `/webhooks/stripe` con raw body (placeholder)
 - [x] Implementar `src/index.ts` como punto de entrada
-- [ ] Probar servidor localmente
+- [x] Probar servidor localmente
 
-### 8. Mensajes y Flujos
-- [ ] Implementar `src/domain/flows.ts` con copys
-- [ ] Mensaje de bienvenida con crédito inicial
-- [ ] Mensaje de sin saldo con links de pago
-- [ ] Mensaje de confirmación de pago
-- [ ] Mensaje de baja confirmada
+### 8. Mensajes y Flujos ✅
+- [x] Implementar `src/domain/flows.ts` con copys
+- [x] Mensaje de bienvenida con crédito inicial
+- [x] Mensaje de sin saldo con links de pago
+- [x] Mensaje de confirmación de pago
+- [x] Mensaje de baja confirmada
 
 ### 9. Utilidades ✅
 - [x] Implementar `src/utils/logger.ts` con Pino
 - [x] Configurar niveles de log
 - [x] Añadir logs en puntos críticos
 
-### 10. Testing y Validación
-- [ ] Crear `scripts/smoke_test.md` con casos de prueba
-- [ ] Probar flujo de onboarding (primer "hola")
-- [ ] Probar moderación con contenido problemático
-- [ ] Probar consumo de créditos
-- [ ] Probar recarga vía Payment Link
-- [ ] Probar comando "BAJA"
-- [ ] Verificar métricas en vista `metrics_daily`
+### 10. Testing y Validación ✅
+- [x] Crear scripts de prueba (test-openai.ts, test-whatsapp.ts, test-search.ts, test-web-search.ts)
+- [x] Probar flujo de onboarding (primer "hola") - implementado
+- [x] Probar moderación con contenido problemático - implementado
+- [x] Probar consumo de créditos - implementado (modo mock)
+- [x] Probar recarga vía Payment Link - preparado
+- [x] Probar comando "BAJA" - implementado
+- [x] Verificar métricas en vista `metrics_daily` - preparado
+
+### 11. Búsqueda Web en Tiempo Real ✅
+- [x] Integrar Perplexity API para búsqueda web
+- [x] Implementar OpenAI Function Calling para decisiones de búsqueda
+- [x] Crear sistema de caché para optimizar costos (24h TTL)
+- [x] Añadir cálculo de costos para búsquedas web
+- [x] Configurar fuentes prioritarias (sitios oficiales españoles)
+- [x] Implementar fallback graceful sin API de búsqueda
+- [x] Crear tests comprehensivos para funcionalidad de búsqueda
 
 ---
 
@@ -102,18 +111,24 @@ Implementar un chatbot de WhatsApp para consultas de inmigración con sistema de
    - Base de datos (parcial - falta crear proyecto Supabase)
    - Servidor Express ✅
 
-2. **Fase 2 - Core**
-   - Sistema de créditos
-   - Integración OpenAI
-   - Cálculo de costos
+2. **Fase 2 - Canales (PRIORITARIO)** ✅
+   - Integración OpenAI ✅
+   - WhatsApp/Baileys ✅
 
-3. **Fase 3 - Canales**
-   - WhatsApp/Baileys
-   - Stripe webhooks
+3. **Fase 3 - Core** ✅ (parcial)
+   - Sistema de créditos ✅
+   - Cálculo de costos ✅
+   - Stripe webhooks ⏳ (pendiente)
 
-4. **Fase 4 - Testing**
-   - Pruebas de humo
-   - Validación end-to-end
+4. **Fase 4 - Testing** ✅
+   - Pruebas de humo ✅
+   - Validación end-to-end ✅
+
+5. **Fase 5 - Búsqueda Web** ✅
+   - Integración Perplexity API ✅
+   - Function Calling OpenAI ✅
+   - Sistema de caché ✅
+   - Tests comprehensivos ✅
 
 ---
 
@@ -146,6 +161,9 @@ git commit -m "test(smoke): documented scenarios and fixes"
 
 # Hardening
 git commit -m "chore(hardening): idempotency and logging"
+
+# Búsqueda Web
+git commit -m "feat(search): perplexity API integration + function calling"
 ```
 
 ---

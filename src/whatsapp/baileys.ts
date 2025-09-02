@@ -1,0 +1,259 @@
+import makeWASocket, { 
+  useMultiFileAuthState, 
+  ConnectionState, 
+  WAMessage,
+  proto,
+  DisconnectReason,
+  fetchLatestBaileysVersion
+} from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import * as qrcode from 'qrcode-terminal'
+import { logger } from '../utils/logger'
+import { ensureUser, hasCredits, debitCredits, deleteUserData, getTopupLinks } from '../domain/credit'
+import { askImmigrationQuestion } from '../llm/openai'
+import { isContentAppropriate } from '../llm/moderation'
+import { MESSAGES, COMMANDS } from '../domain/flows'
+
+export class WhatsAppBot {
+  private socket: ReturnType<typeof makeWASocket> | null = null
+  private isConnecting = false
+
+  async start(): Promise<void> {
+    if (this.isConnecting) {
+      logger.info('WhatsApp connection already in progress')
+      return
+    }
+
+    this.isConnecting = true
+
+    try {
+      const authDir = process.env.BAILEYS_STATE_DIR || 'auth'
+      const { state, saveCreds } = await useMultiFileAuthState(authDir)
+      const { version } = await fetchLatestBaileysVersion()
+
+      logger.info({ version, authDir }, 'Starting WhatsApp connection')
+
+      this.socket = makeWASocket({
+        version,
+        auth: state,
+        logger: logger.child({ module: 'baileys' }),
+        browser: ['Reco Extranjería', 'Chrome', '1.0.0'],
+        generateHighQualityLinkPreview: false,
+        markOnlineOnConnect: false
+      })
+
+      // Handle credentials updates
+      this.socket.ev.on('creds.update', saveCreds)
+
+      // Handle connection updates
+      this.socket.ev.on('connection.update', this.handleConnectionUpdate.bind(this))
+
+      // Handle incoming messages
+      this.socket.ev.on('messages.upsert', this.handleMessages.bind(this))
+
+      logger.info('WhatsApp bot started successfully')
+
+    } catch (error) {
+      logger.error({ error }, 'Failed to start WhatsApp bot')
+      this.isConnecting = false
+      throw error
+    }
+  }
+
+  private async handleConnectionUpdate(update: Partial<ConnectionState>): Promise<void> {
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      logger.info('QR Code generated - scan with WhatsApp to connect')
+      console.log('\n📱 WhatsApp QR Code:')
+      console.log('⬇️ Scan this QR code with your WhatsApp mobile app\n')
+      qrcode.generate(qr, { small: true })
+      console.log('\n💡 After scanning, you can send messages to test the bot!')
+    }
+
+    if (connection === 'close') {
+      const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+      
+      logger.info({ 
+        shouldReconnect, 
+        statusCode: (lastDisconnect?.error as Boom)?.output?.statusCode 
+      }, 'WhatsApp connection closed')
+
+      if (shouldReconnect) {
+        logger.info('Attempting to reconnect to WhatsApp...')
+        this.isConnecting = false
+        setTimeout(() => this.start(), 3000)
+      } else {
+        logger.warn('WhatsApp logged out - manual re-authentication required')
+        this.isConnecting = false
+      }
+    } else if (connection === 'open') {
+      logger.info('WhatsApp connection established successfully')
+      this.isConnecting = false
+    }
+  }
+
+  private async handleMessages(msgUpdate: { messages: WAMessage[], type: 'notify' | 'append' }): Promise<void> {
+    const { messages } = msgUpdate
+
+    for (const message of messages) {
+      try {
+        await this.processMessage(message)
+      } catch (error) {
+        logger.error({ error, messageKey: message.key }, 'Error processing message')
+      }
+    }
+  }
+
+  private async processMessage(message: WAMessage): Promise<void> {
+    // Skip if no message content or if it's from us
+    if (!message.message || message.key.fromMe) {
+      return
+    }
+
+    const messageType = Object.keys(message.message)[0]
+    
+    // Only process text messages for MVP
+    if (messageType !== 'conversation' && messageType !== 'extendedTextMessage') {
+      await this.sendMessage(
+        message.key.remoteJid!,
+        MESSAGES.onlyText()
+      )
+      return
+    }
+
+    const text = message.message.conversation || 
+                 message.message.extendedTextMessage?.text || ''
+
+    const phoneE164 = this.extractPhoneNumber(message.key.remoteJid!)
+    
+    if (!phoneE164) {
+      logger.warn({ remoteJid: message.key.remoteJid }, 'Could not extract phone number')
+      return
+    }
+
+    logger.info({ 
+      phoneE164, 
+      messageLength: text.length,
+      messageType 
+    }, 'Processing WhatsApp message')
+
+    await this.handleUserMessage(phoneE164, text)
+  }
+
+  private async handleUserMessage(phoneE164: string, text: string): Promise<void> {
+    // Get or create user
+    const user = await ensureUser(phoneE164)
+    if (!user) {
+      logger.error({ phoneE164 }, 'Failed to ensure user')
+      await this.sendMessage(phoneE164, MESSAGES.error())
+      return
+    }
+
+    const jid = phoneE164.replace('+', '') + '@s.whatsapp.net'
+    const isNewUser = user.credits_cents === Number(process.env.BOT_INIT_CREDITS_CENTS ?? 300)
+
+    // Handle BAJA command first
+    if (COMMANDS.isBajaCommand(text)) {
+      const deleted = await deleteUserData(user.id)
+      if (deleted) {
+        await this.sendMessage(jid, MESSAGES.dataDeleted())
+      } else {
+        await this.sendMessage(jid, MESSAGES.error())
+      }
+      return
+    }
+
+    // Send welcome message for new users or simple greetings
+    if (isNewUser || /^(hola|hi|hello|buenas|hey)$/i.test(text.trim())) {
+      await this.sendMessage(jid, MESSAGES.welcome(isNewUser))
+      if (isNewUser) return // Don't process the greeting as a question for new users
+    }
+
+    // Content moderation
+    const isAppropriate = await isContentAppropriate(text)
+    if (!isAppropriate) {
+      await this.sendMessage(jid, MESSAGES.moderationWarning())
+      return
+    }
+
+    // Check credits
+    const userHasCredits = await hasCredits(user.id)
+    if (!userHasCredits) {
+      const links = getTopupLinks()
+      await this.sendMessage(jid, MESSAGES.noCredits(links))
+      return
+    }
+
+    // Process immigration question with OpenAI
+    await this.sendTyping(jid, true)
+    
+    try {
+      const response = await askImmigrationQuestion(text)
+      
+      // Debit credits based on actual usage
+      await debitCredits(user.id, response.cost_cents)
+      
+      await this.sendMessage(jid, response.text)
+      
+      logger.info({ 
+        phoneE164,
+        tokens: response.usage.total_tokens,
+        costCents: response.cost_cents
+      }, 'Immigration question processed successfully')
+
+    } catch (error) {
+      logger.error({ error, phoneE164 }, 'Error processing immigration question')
+      await this.sendMessage(jid, MESSAGES.error())
+    } finally {
+      await this.sendTyping(jid, false)
+    }
+  }
+
+  private extractPhoneNumber(remoteJid: string): string | null {
+    // Format: 1234567890@s.whatsapp.net -> +1234567890
+    const match = remoteJid.match(/^(\d+)@s\.whatsapp\.net$/)
+    if (match) {
+      return '+' + match[1]
+    }
+    return null
+  }
+
+  private async sendMessage(jid: string, text: string): Promise<void> {
+    if (!this.socket) {
+      logger.error('Cannot send message: WhatsApp socket not connected')
+      return
+    }
+
+    try {
+      await this.socket.sendMessage(jid, { text })
+      logger.info({ jid, textLength: text.length }, 'Message sent successfully')
+    } catch (error) {
+      logger.error({ error, jid }, 'Failed to send message')
+    }
+  }
+
+  private async sendTyping(jid: string, isTyping: boolean): Promise<void> {
+    if (!this.socket) return
+
+    try {
+      await this.socket.sendPresenceUpdate(isTyping ? 'composing' : 'available', jid)
+    } catch (error) {
+      logger.error({ error, jid }, 'Failed to send typing indicator')
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.socket) {
+      logger.info('Stopping WhatsApp bot...')
+      this.socket.end(undefined)
+      this.socket = null
+    }
+  }
+}
+
+export async function startWhatsAppBot(): Promise<WhatsAppBot> {
+  const bot = new WhatsAppBot()
+  await bot.start()
+  return bot
+}

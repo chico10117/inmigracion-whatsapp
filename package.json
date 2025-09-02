@@ -8,25 +8,39 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:openai": "ts-node scripts/test-openai.ts",
+    "test:whatsapp": "ts-node scripts/test-whatsapp.ts",
+    "test:search": "ts-node scripts/test-search.ts",
+    "test:web-search": "ts-node scripts/test-web-search.ts"
   },
-  "keywords": ["whatsapp", "chatbot", "immigration", "spain"],
+  "keywords": [
+    "whatsapp",
+    "chatbot",
+    "immigration",
+    "spain"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.0",
-    "openai": "^4.65.0",
-    "stripe": "^14.21.0",
+    "@hapi/boom": "^10.0.1",
     "@supabase/supabase-js": "^2.43.2",
+    "@whiskeysockets/baileys": "^6.7.0",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "zod": "^3.22.4",
+    "openai": "^4.65.0",
     "pino": "^8.19.0",
-    "dotenv": "^16.4.5"
+    "qrcode-terminal": "^0.12.0",
+    "stripe": "^14.21.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "ts-node-dev": "^2.0.0",
+    "@types/express": "^4.17.21",
     "@types/node": "^20.12.7",
-    "@types/express": "^4.17.21"
+    "@types/qrcode-terminal": "^0.12.2",
+    "pino-pretty": "^13.1.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
   }
 }

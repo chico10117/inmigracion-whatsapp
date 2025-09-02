@@ -68,7 +68,7 @@ Create a `.env` file with (see `.env.example` for full template):
 ```
 # OpenAI
 OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4-turbo
+OPENAI_MODEL=gpt-4.1
 
 # Perplexity (for real-time search)
 PERPLEXITY_API_KEY=your_perplexity_key_here

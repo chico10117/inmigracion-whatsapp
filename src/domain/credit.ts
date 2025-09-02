@@ -11,18 +11,35 @@ export interface User {
   is_blocked: boolean
 }
 
+// In-memory mock user storage for testing
+const mockUsers = new Map<string, User>()
+// Track if this is the user's first message
+const firstInteraction = new Set<string>()
+
 export async function ensureUser(phoneE164: string): Promise<User | null> {
   try {
     if (!supa) {
       logger.warn('Supabase not configured, using mock user')
-      return {
-        id: 'mock-user',
+      
+      // Check if mock user already exists
+      if (mockUsers.has(phoneE164)) {
+        return mockUsers.get(phoneE164)!
+      }
+      
+      // Create new mock user
+      const newMockUser: User = {
+        id: `mock-${phoneE164}`,
         phone_e164: phoneE164,
         credits_cents: 300,
         created_at: new Date().toISOString(),
         lang: 'es',
         is_blocked: false
       }
+      
+      mockUsers.set(phoneE164, newMockUser)
+      // Mark this as their first interaction
+      firstInteraction.add(phoneE164)
+      return newMockUser
     }
 
     // Check if user exists
@@ -75,8 +92,14 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
 
 export async function hasCredits(userId: string): Promise<boolean> {
   try {
-    if (!supa || userId === 'mock-user') {
-      return true // Mock user always has credits for testing
+    if (!supa || userId.startsWith('mock-')) {
+      // Find mock user by ID and check credits
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          return user.credits_cents > 0
+        }
+      }
+      return true // Default for testing
     }
 
     const { data } = await supa
@@ -99,9 +122,16 @@ export async function debitCredits(
   messageId?: string
 ): Promise<number> {
   try {
-    if (!supa || userId === 'mock-user') {
-      logger.info({ userId, costCents }, 'Mock debit for testing')
-      return 250 // Mock remaining balance
+    if (!supa || userId.startsWith('mock-')) {
+      // Find and update mock user credits
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          user.credits_cents = Math.max(0, user.credits_cents - costCents)
+          logger.info({ userId, costCents, newBalance: user.credits_cents }, 'Mock debit for testing')
+          return user.credits_cents
+        }
+      }
+      return 250 // Default for testing
     }
 
     const { data: user } = await supa
@@ -150,10 +180,26 @@ export function getTopupLinks(): string[] {
   return PAYMENT_LINKS.getLinks()
 }
 
+export function isFirstInteraction(phoneE164: string): boolean {
+  return firstInteraction.has(phoneE164)
+}
+
+export function clearFirstInteraction(phoneE164: string): void {
+  firstInteraction.delete(phoneE164)
+}
+
 export async function deleteUserData(userId: string): Promise<boolean> {
   try {
-    if (!supa || userId === 'mock-user') {
-      logger.info({ userId }, 'Mock user data deletion')
+    if (!supa || userId.startsWith('mock-')) {
+      // Find phone by user ID and remove from mock storage
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          mockUsers.delete(phone)
+          firstInteraction.delete(phone)
+          logger.info({ userId, phone }, 'Mock user data deletion')
+          return true
+        }
+      }
       return true
     }
 

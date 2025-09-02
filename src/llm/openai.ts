@@ -53,7 +53,15 @@ export interface OpenAIResponse {
 // Initialize search handler
 const searchHandler = new SearchHandler()
 
-export async function askImmigrationQuestion(question: string): Promise<OpenAIResponse> {
+export interface ConversationMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function askImmigrationQuestion(
+  question: string, 
+  conversationHistory: ConversationMessage[] = []
+): Promise<OpenAIResponse> {
   try {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured')
@@ -61,26 +69,43 @@ export async function askImmigrationQuestion(question: string): Promise<OpenAIRe
 
     const model = process.env.OPENAI_MODEL ?? 'gpt-4.1'
     
-    logger.info({ model, questionLength: question.length }, 'Processing immigration question')
+    logger.info({ 
+      model, 
+      questionLength: question.length,
+      historyLength: conversationHistory.length 
+    }, 'Processing immigration question')
 
     let searchResult: SearchHandlerResult | null = null
     let finalResponse = ''
     let totalSearchCost = 0
     let allSources: string[] = []
 
+    // Build messages array with conversation history
+    const messages: any[] = [
+      { 
+        role: 'system', 
+        content: IMMIGRATION_SYSTEM_PROMPT 
+      }
+    ]
+    
+    // Add conversation history
+    conversationHistory.forEach(msg => {
+      messages.push({
+        role: msg.role,
+        content: msg.content
+      })
+    })
+    
+    // Add current question
+    messages.push({ 
+      role: 'user', 
+      content: question 
+    })
+
     // Initial request with function calling enabled
     const response = await client.chat.completions.create({
       model,
-      messages: [
-        { 
-          role: 'system', 
-          content: IMMIGRATION_SYSTEM_PROMPT 
-        },
-        { 
-          role: 'user', 
-          content: question 
-        }
-      ],
+      messages,
       tools: [SEARCH_FUNCTION_DEFINITION],
       tool_choice: 'auto', // Let AI decide when to use search
       max_tokens: 500,

@@ -9,10 +9,11 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom'
 import * as qrcode from 'qrcode-terminal'
 import { logger } from '../utils/logger'
-import { ensureUser, hasCredits, debitCredits, deleteUserData, getTopupLinks } from '../domain/credit'
-import { askImmigrationQuestion } from '../llm/openai'
+import { ensureUser, hasCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction } from '../domain/credit'
+import { askImmigrationQuestion, ConversationMessage } from '../llm/openai'
 import { isContentAppropriate } from '../llm/moderation'
 import { MESSAGES, COMMANDS } from '../domain/flows'
+import { addUserMessage, addAssistantMessage, getConversationMessages, clearConversation } from '../domain/conversation'
 
 export class WhatsAppBot {
   private socket: ReturnType<typeof makeWASocket> | null = null
@@ -142,6 +143,12 @@ export class WhatsAppBot {
   }
 
   private async handleUserMessage(phoneE164: string, text: string): Promise<void> {
+    // Only respond to specific phone number
+    if (phoneE164 !== '+34686468168') {
+      logger.info({ phoneE164 }, 'Ignoring message from unauthorized number')
+      return
+    }
+
     // Get or create user
     const user = await ensureUser(phoneE164)
     if (!user) {
@@ -151,12 +158,14 @@ export class WhatsAppBot {
     }
 
     const jid = phoneE164.replace('+', '') + '@s.whatsapp.net'
-    const isNewUser = user.credits_cents === Number(process.env.BOT_INIT_CREDITS_CENTS ?? 300)
+    const isNewUser = isFirstInteraction(phoneE164)
 
     // Handle BAJA command first
     if (COMMANDS.isBajaCommand(text)) {
       const deleted = await deleteUserData(user.id)
       if (deleted) {
+        // Clear conversation history when user data is deleted
+        clearConversation(phoneE164)
         await this.sendMessage(jid, MESSAGES.dataDeleted())
       } else {
         await this.sendMessage(jid, MESSAGES.error())
@@ -164,10 +173,23 @@ export class WhatsAppBot {
       return
     }
 
-    // Send welcome message for new users or simple greetings
-    if (isNewUser || /^(hola|hi|hello|buenas|hey)$/i.test(text.trim())) {
+    // Check if it's just a simple greeting
+    const isSimpleGreeting = /^(hola|hi|hello|buenas|hey)$/i.test(text.trim())
+    
+    // Handle greetings and new users
+    if (isSimpleGreeting) {
+      // Always send welcome for greetings
       await this.sendMessage(jid, MESSAGES.welcome(isNewUser))
-      if (isNewUser) return // Don't process the greeting as a question for new users
+      // Clear first interaction flag after sending welcome
+      if (isNewUser) {
+        clearFirstInteraction(phoneE164)
+      }
+      return // Don't process greetings as questions
+    } else if (isNewUser) {
+      // For new users with real questions, send welcome but continue processing
+      await this.sendMessage(jid, MESSAGES.welcome(true))
+      // Clear first interaction flag after sending welcome
+      clearFirstInteraction(phoneE164)
     }
 
     // Content moderation
@@ -185,11 +207,28 @@ export class WhatsAppBot {
       return
     }
 
+    // Add user message to conversation history
+    addUserMessage(phoneE164, text)
+    
+    // Get conversation history for context
+    const conversationHistory = getConversationMessages(phoneE164)
+    
+    // Convert to format expected by OpenAI (exclude the current message as we pass it separately)
+    const historyForOpenAI: ConversationMessage[] = conversationHistory
+      .slice(0, -1) // Remove the last message (current user message)
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+    
     // Process immigration question with OpenAI
     await this.sendTyping(jid, true)
     
     try {
-      const response = await askImmigrationQuestion(text)
+      const response = await askImmigrationQuestion(text, historyForOpenAI)
+      
+      // Add assistant response to conversation history
+      addAssistantMessage(phoneE164, response.text)
       
       // Debit credits based on actual usage
       await debitCredits(user.id, response.cost_cents)
@@ -199,7 +238,8 @@ export class WhatsAppBot {
       logger.info({ 
         phoneE164,
         tokens: response.usage.total_tokens,
-        costCents: response.cost_cents
+        costCents: response.cost_cents,
+        conversationLength: conversationHistory.length
       }, 'Immigration question processed successfully')
 
     } catch (error) {

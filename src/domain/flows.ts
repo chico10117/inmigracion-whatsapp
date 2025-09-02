@@ -2,7 +2,7 @@ export const MESSAGES = {
   welcome: (isNewUser: boolean = true) => `
 ¡Hola! Soy **Reco Extranjería** 🇪🇸
 
-${isNewUser ? 'Te regalo **€3 de saldo** para tus primeras consultas.' : ''}
+${isNewUser ? 'Te regalo **€0.30 de saldo** para tus primeras consultas.' : ''}
 
 Puedo ayudarte con información sobre:
 • Renovación de NIE/TIE
@@ -22,16 +22,16 @@ Puedo ayudarte con información sobre:
 
 Para continuar consultando, recarga tu saldo:
 
-💳 **€5** → ${links[0] || 'Configurar link'}
-💳 **€10** → ${links[1] || 'Configurar link'}  
-💳 **€15** → ${links[2] || 'Configurar link'}
+💳 **€2** → ${links[0] || 'Configurar link'}
+💳 **€5** → ${links[1] || 'Configurar link'}  
+💳 **€10** → ${links[2] || 'Configurar link'}
 
 Una vez realices el pago, tu saldo se actualizará automáticamente.`.trim(),
 
-  paymentReceived: (amountEur: number) => `
+  paymentReceived: (amountUsd: number) => `
 ✅ **¡Pago recibido!**
 
-Tu nuevo saldo es **€${amountEur.toFixed(2)}**
+Tu nuevo saldo es **€${amountUsd.toFixed(2)}**
 
 ¡Ya puedes continuar con tus consultas sobre extranjería!`.trim(),
 
@@ -66,9 +66,9 @@ Por favor, escribe tu consulta sobre extranjería en lugar de enviar audios o im
 
 export const PAYMENT_LINKS = {
   getLinks: (): string[] => [
-    process.env.STRIPE_LINK_5_EUR || '',
-    process.env.STRIPE_LINK_10_EUR || '',  
-    process.env.STRIPE_LINK_15_EUR || ''
+    process.env.STRIPE_LINK_2_EUR || '',
+    process.env.STRIPE_LINK_5_EUR || '',  
+    process.env.STRIPE_LINK_10_EUR || ''
   ]
 }
 

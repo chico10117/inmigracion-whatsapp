@@ -1,6 +1,5 @@
-export function toCentsEUR(usd: number): number {
-  const rate = Number(process.env.USD_EUR_RATE ?? 0.92)
-  return Math.round(usd * rate * 100)
+export function toCentsUSD(usd: number): number {
+  return Math.round(usd * 100)
 }
 
 // GPT-4.1 pricing per token (USD)
@@ -22,7 +21,7 @@ export interface UsageDetails {
   cached_tokens: number
   output_tokens: number
   cost_usd: number
-  cost_eur_cents: number
+  cost_usd_cents: number
 }
 
 export function calculateAccurateCost(model: string, usage: {
@@ -52,15 +51,15 @@ export function calculateAccurateCost(model: string, usage: {
   const costMultiplier = Number(process.env.COST_MULTIPLIER ?? 1.15)
   const usdWithMargin = cost_usd * costMultiplier
   
-  // Convert to EUR cents
-  const cost_eur_cents = toCentsEUR(usdWithMargin)
+  // Convert to USD cents
+  const cost_usd_cents = toCentsUSD(usdWithMargin)
   
   return {
     input_tokens: input,
     cached_tokens: cached,
     output_tokens: output,
     cost_usd: usdWithMargin,
-    cost_eur_cents
+    cost_usd_cents
   }
 }
 
@@ -75,5 +74,5 @@ export function estimateCostCents({
   return calculateAccurateCost("gpt-4.1", {
     input_tokens: prompt_tokens,
     output_tokens: completion_tokens
-  }).cost_eur_cents
+  }).cost_usd_cents
 }

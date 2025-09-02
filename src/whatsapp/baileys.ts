@@ -143,8 +143,9 @@ export class WhatsAppBot {
   }
 
   private async handleUserMessage(phoneE164: string, text: string): Promise<void> {
-    // Only respond to specific phone number
-    if (phoneE164 !== '+34686468168') {
+    // Only respond to authorized phone numbers
+    const authorizedNumbers = ['+34686468168', '+5215555042401']
+    if (!authorizedNumbers.includes(phoneE164)) {
       logger.info({ phoneE164 }, 'Ignoring message from unauthorized number')
       return
     }
@@ -250,8 +251,8 @@ export class WhatsAppBot {
         searchCostCents: response.search_cost_cents,
         searchUsed: response.search_used,
         conversationLength: conversationHistory.length,
-        finalCreditsEurCents: finalCredits,
-        finalCreditsEur: (finalCredits / 100).toFixed(2)
+        finalCreditsUsdCents: finalCredits,
+        finalCreditsDisplayEur: (finalCredits / 100).toFixed(2) // Shown as EUR to users (1:1 rate)
       }, 'Immigration question processed with accurate cost tracking')
 
     } catch (error) {

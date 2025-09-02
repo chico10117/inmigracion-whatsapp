@@ -30,7 +30,7 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
       const newMockUser: User = {
         id: `mock-${phoneE164}`,
         phone_e164: phoneE164,
-        credits_cents: 300,
+        credits_cents: 30, // $0.30 USD (shown as €0.30 to users)
         created_at: new Date().toISOString(),
         lang: 'es',
         is_blocked: false
@@ -54,7 +54,7 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
     }
 
     // Create new user with initial credits
-    const initialCredits = Number(process.env.BOT_INIT_CREDITS_CENTS ?? 300)
+    const initialCredits = Number(process.env.BOT_INIT_CREDITS_CENTS ?? 30) // $0.30 USD (€0.30 to users)
     
     const { data: newUser, error } = await supa
       .from('users')
@@ -151,7 +151,7 @@ export async function getUserCredits(userId: string): Promise<number> {
           return user.credits_cents
         }
       }
-      return 300 // Default for testing
+      return 30 // Default for testing ($0.30 USD / €0.30)
     }
 
     const { data } = await supa
@@ -183,7 +183,7 @@ export async function debitCredits(
           return user.credits_cents
         }
       }
-      return 250 // Default for testing
+      return 25 // Default for testing ($0.25 USD remaining / €0.25)
     }
 
     const { data: user } = await supa

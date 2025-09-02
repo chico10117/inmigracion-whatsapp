@@ -188,7 +188,7 @@ export class SearchHandler {
   }
 }
 
-// Export search function definition for OpenAI
+// Export search function definition for OpenAI Chat Completions API
 export const SEARCH_FUNCTION_DEFINITION = {
   type: 'function' as const,
   function: {

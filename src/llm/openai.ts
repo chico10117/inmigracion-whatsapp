@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { estimateCostCents, calculateAccurateCost, UsageDetails } from '../domain/calc'
+import { calculateAccurateCost, UsageDetails } from '../domain/calc'
 import { logger } from '../utils/logger'
 import { SearchHandler, SEARCH_FUNCTION_DEFINITION, SearchHandlerResult } from './search-handler'
 
@@ -106,16 +106,14 @@ export async function askImmigrationQuestion(
       content: question 
     })
 
-    // Initial request with function calling enabled
+    // Temporary fallback to Chat Completions until Responses API access is confirmed
     const response = await client.chat.completions.create({
       model,
       messages,
       tools: [SEARCH_FUNCTION_DEFINITION],
-      tool_choice: 'auto', // Let AI decide when to use search
+      tool_choice: 'auto',
       max_tokens: 500,
-      temperature: 0.7,
-      presence_penalty: 0.1,
-      frequency_penalty: 0.1
+      temperature: 0.7
     })
 
     const message = response.choices[0]?.message
@@ -139,7 +137,7 @@ export async function askImmigrationQuestion(
           totalSearchCost = searchResult.cost_cents
           allSources = searchResult.sources
           
-          // Continue conversation with search results
+          // Continue conversation with search results - fall back to Chat Completions for tool follow-up
           const followUpResponse = await client.chat.completions.create({
             model,
             messages: [
@@ -158,12 +156,25 @@ export async function askImmigrationQuestion(
           
           finalResponse = followUpResponse.choices[0]?.message?.content || ''
           
-          // Add search usage to total
-          const followUpUsage = followUpResponse.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+          // Add search usage to total - Chat Completions API
+          const followUpUsage = followUpResponse.usage || { 
+            prompt_tokens: 0, 
+            completion_tokens: 0, 
+            total_tokens: 0
+          }
+          
+          // Get initial usage from Chat Completions API  
+          const initialUsage = response.usage || { 
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0
+          }
+          
+          // Aggregate usage from both API calls
           response.usage = {
-            prompt_tokens: (response.usage?.prompt_tokens || 0) + followUpUsage.prompt_tokens,
-            completion_tokens: (response.usage?.completion_tokens || 0) + followUpUsage.completion_tokens,
-            total_tokens: (response.usage?.total_tokens || 0) + followUpUsage.total_tokens
+            prompt_tokens: initialUsage.prompt_tokens + followUpUsage.prompt_tokens,
+            completion_tokens: initialUsage.completion_tokens + followUpUsage.completion_tokens,
+            total_tokens: initialUsage.total_tokens + followUpUsage.total_tokens
           }
           
         } catch (error) {
@@ -183,20 +194,17 @@ export async function askImmigrationQuestion(
     const usage = response.usage ?? { 
       prompt_tokens: 0, 
       completion_tokens: 0, 
-      total_tokens: 0,
-      input_tokens: 0,
-      input_tokens_details: { cached_tokens: 0 },
-      output_tokens: 0
+      total_tokens: 0
     }
 
-    // Calculate accurate cost using GPT-4.1 pricing
+    // Calculate accurate cost using GPT-4.1 pricing (Chat Completions uses prompt/completion tokens)
     const costDetails = calculateAccurateCost(model, {
-      input_tokens: usage.input_tokens || usage.prompt_tokens,
-      input_tokens_details: { cached_tokens: usage.input_tokens_details?.cached_tokens || 0 },
-      output_tokens: usage.output_tokens || usage.completion_tokens
+      input_tokens: usage.prompt_tokens,
+      input_tokens_details: { cached_tokens: 0 }, // Chat Completions doesn't provide cached token info
+      output_tokens: usage.completion_tokens
     })
 
-    const totalCostCents = costDetails.cost_eur_cents + totalSearchCost
+    const totalCostCents = costDetails.cost_usd_cents + totalSearchCost
 
     logger.info({ 
       model,
@@ -205,7 +213,7 @@ export async function askImmigrationQuestion(
       cachedTokens: costDetails.cached_tokens,
       outputTokens: costDetails.output_tokens,
       openaiCostUsd: costDetails.cost_usd,
-      openaiCostCents: costDetails.cost_eur_cents,
+      openaiCostCents: costDetails.cost_usd_cents,
       searchCostCents: totalSearchCost,
       totalCostCents,
       searchUsed: Boolean(searchResult),
@@ -216,9 +224,9 @@ export async function askImmigrationQuestion(
     return {
       text: finalResponse,
       usage: {
-        prompt_tokens: usage.prompt_tokens,
-        completion_tokens: usage.completion_tokens,
-        total_tokens: usage.total_tokens,
+        prompt_tokens: costDetails.input_tokens,
+        completion_tokens: costDetails.output_tokens,
+        total_tokens: costDetails.input_tokens + costDetails.output_tokens,
         input_tokens: costDetails.input_tokens,
         cached_tokens: costDetails.cached_tokens,
         output_tokens: costDetails.output_tokens

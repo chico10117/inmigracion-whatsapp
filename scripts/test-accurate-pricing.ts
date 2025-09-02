@@ -3,7 +3,7 @@ import { calculateAccurateCost, PRICING } from '../src/domain/calc'
 import { logger } from '../src/utils/logger'
 
 async function testAccuratePricing() {
-  console.log('🧮 Testing Accurate GPT-4.1 Token Pricing...\\n')
+  console.log('🧮 Testing Accurate GPT-4.1 Token Pricing (USD)...\\n')
   
   // Test case 1: Basic calculation without cached tokens
   console.log('📋 Test Case 1: Basic Cost Calculation (No Cache)')
@@ -18,8 +18,8 @@ async function testAccuratePricing() {
   console.log(`   Cached tokens: ${cost1.cached_tokens}`)
   console.log(`   Output tokens: ${cost1.output_tokens}`)
   console.log(`   Cost USD: $${cost1.cost_usd.toFixed(6)}`)
-  console.log(`   Cost EUR cents: ${cost1.cost_eur_cents}`)
-  console.log(`   Cost EUR: €${(cost1.cost_eur_cents / 100).toFixed(4)}`)
+  console.log(`   Cost USD cents: ${cost1.cost_usd_cents}`)
+  console.log(`   Cost USD: $${(cost1.cost_usd_cents / 100).toFixed(4)}`)
   
   // Manual verification
   const expectedUsdBase = 
@@ -27,12 +27,12 @@ async function testAccuratePricing() {
     (0 * PRICING["gpt-4.1"].cached_input_per_token) +
     (300 * PRICING["gpt-4.1"].output_per_token)
   const expectedUsdWithMargin = expectedUsdBase * 1.15
-  const expectedEurCents = Math.round(expectedUsdWithMargin * 0.92 * 100)
+  const expectedUsdCents = Math.round(expectedUsdWithMargin * 100)
   
   console.log(`   Expected USD (base): $${expectedUsdBase.toFixed(6)}`)
   console.log(`   Expected USD (with margin): $${expectedUsdWithMargin.toFixed(6)}`)
-  console.log(`   Expected EUR cents: ${expectedEurCents}`)
-  console.log(`   ✅ Calculation ${cost1.cost_eur_cents === expectedEurCents ? 'CORRECT' : 'INCORRECT'}`)
+  console.log(`   Expected USD cents: ${expectedUsdCents}`)
+  console.log(`   ✅ Calculation ${cost1.cost_usd_cents === expectedUsdCents ? 'CORRECT' : 'INCORRECT'}`)
   console.log('')
 
   // Test case 2: With cached tokens (should be cheaper)
@@ -48,24 +48,24 @@ async function testAccuratePricing() {
   console.log(`   Cached tokens: ${cost2.cached_tokens} (75% discount)`)
   console.log(`   Output tokens: ${cost2.output_tokens}`)
   console.log(`   Cost USD: $${cost2.cost_usd.toFixed(6)}`)
-  console.log(`   Cost EUR cents: ${cost2.cost_eur_cents}`)
-  console.log(`   Cost EUR: €${(cost2.cost_eur_cents / 100).toFixed(4)}`)
+  console.log(`   Cost USD cents: ${cost2.cost_usd_cents}`)
+  console.log(`   Cost USD: $${(cost2.cost_usd_cents / 100).toFixed(4)}`)
   
-  const savings = cost1.cost_eur_cents - cost2.cost_eur_cents
-  console.log(`   💰 Savings from caching: ${savings} cents (€${(savings/100).toFixed(4)})`)
+  const savings = cost1.cost_usd_cents - cost2.cost_usd_cents
+  console.log(`   💰 Savings from caching: ${savings} cents ($${(savings/100).toFixed(4)})`)
   console.log('')
 
-  // Test case 3: €3 limit simulation
-  console.log('📋 Test Case 3: €3 Credit Limit Simulation')
-  const totalBudgetCents = 300 // €3.00
-  console.log(`   Total budget: ${totalBudgetCents} cents (€${(totalBudgetCents/100).toFixed(2)})`)
+  // Test case 3: €0.30 limit simulation (calculated as $0.30 USD internally)
+  console.log('📋 Test Case 3: €0.30 Credit Limit Simulation')
+  const totalBudgetCents = 30 // $0.30 USD (shown as €0.30)
+  console.log(`   Total budget: ${totalBudgetCents} cents ($${(totalBudgetCents/100).toFixed(2)} USD / €${(totalBudgetCents/100).toFixed(2)})`)
   
-  // Simulate multiple queries to see how many fit in €3
-  const avgQueryCost = cost1.cost_eur_cents
+  // Simulate multiple queries to see how many fit in €0.30
+  const avgQueryCost = cost1.cost_usd_cents
   const maxQueries = Math.floor(totalBudgetCents / avgQueryCost)
   const remainingAfterMax = totalBudgetCents - (maxQueries * avgQueryCost)
   
-  console.log(`   Average query cost: ${avgQueryCost} cents (€${(avgQueryCost/100).toFixed(4)})`)
+  console.log(`   Average query cost: ${avgQueryCost} cents ($${(avgQueryCost/100).toFixed(4)} / €${(avgQueryCost/100).toFixed(4)})`)
   console.log(`   Max queries in budget: ${maxQueries}`)
   console.log(`   Remaining after max queries: ${remainingAfterMax} cents (€${(remainingAfterMax/100).toFixed(4)})`)
   console.log('')
@@ -77,10 +77,10 @@ async function testAccuratePricing() {
   const gpt41Cost = calculateAccurateCost('gpt-4.1', testUsage)
   const gpt4oCost = calculateAccurateCost('gpt-4o', testUsage)
   
-  console.log(`   GPT-4.1 cost: ${gpt41Cost.cost_eur_cents} cents (€${(gpt41Cost.cost_eur_cents/100).toFixed(4)})`)
-  console.log(`   GPT-4o cost:  ${gpt4oCost.cost_eur_cents} cents (€${(gpt4oCost.cost_eur_cents/100).toFixed(4)})`)
+  console.log(`   GPT-4.1 cost: ${gpt41Cost.cost_usd_cents} cents ($${(gpt41Cost.cost_usd_cents/100).toFixed(4)})`)
+  console.log(`   GPT-4o cost:  ${gpt4oCost.cost_usd_cents} cents ($${(gpt4oCost.cost_usd_cents/100).toFixed(4)})`)
   
-  const difference = gpt4oCost.cost_eur_cents - gpt41Cost.cost_eur_cents
+  const difference = gpt4oCost.cost_usd_cents - gpt41Cost.cost_usd_cents
   console.log(`   Difference: ${difference} cents (GPT-4o is ${difference > 0 ? 'more' : 'less'} expensive)`)
   console.log('')
 
@@ -100,16 +100,17 @@ async function testAccuratePricing() {
     })
     console.log(`   ${scenario.name}:`)
     console.log(`     Tokens: ${scenario.input} in + ${scenario.output} out = ${scenario.input + scenario.output} total`)
-    console.log(`     Cost: ${cost.cost_eur_cents} cents (€${(cost.cost_eur_cents/100).toFixed(4)})`)
-    console.log(`     Queries in €3: ~${Math.floor(300 / cost.cost_eur_cents)}`)
+    console.log(`     Cost: ${cost.cost_usd_cents} cents ($${(cost.cost_usd_cents/100).toFixed(4)} / €${(cost.cost_usd_cents/100).toFixed(4)})`)
+    console.log(`     Queries in €0.30: ~${Math.floor(30 / cost.cost_usd_cents)}`)
   })
   
   console.log('\\n🎉 Accurate Pricing Test Completed!')
   console.log('\\n💡 Key Insights:')
   console.log('• GPT-4.1 is cost-effective for immigration queries')
   console.log('• Prompt caching provides significant savings for repeated context')
-  console.log('• €3 budget allows for substantial number of quality interactions')
+  console.log('• €0.30 budget allows for substantial number of quality interactions')
   console.log('• Accurate per-token pricing ensures fair usage tracking')
+  console.log('• 1$ = 1€ rate simplifies user experience while using USD internally')
 }
 
 // Run the test

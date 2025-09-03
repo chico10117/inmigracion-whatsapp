@@ -1,11 +1,17 @@
-import OpenAI from 'openai'
 import { calculateAccurateCost, UsageDetails } from '../domain/calc'
 import { logger } from '../utils/logger'
 import { SearchHandler, SEARCH_FUNCTION_DEFINITION, SearchHandlerResult } from './search-handler'
+import { createResponsesAPIClient, ResponsesAPIMessage, ResponsesAPITool, ResponsesAPIClient } from './responses-api'
 
-const client = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
-})
+// Lazy-initialize Responses API client
+let responsesClient: ResponsesAPIClient | null = null
+
+function getResponsesClient(): ResponsesAPIClient {
+  if (!responsesClient) {
+    responsesClient = createResponsesAPIClient()
+  }
+  return responsesClient
+}
 
 function shouldForceSearch(question: string): boolean {
   try {
@@ -100,15 +106,15 @@ export async function askImmigrationQuestion(
       model, 
       questionLength: question.length,
       historyLength: conversationHistory.length 
-    }, 'Processing immigration question')
+    }, 'Processing immigration question with Responses API')
 
     let searchResult: SearchHandlerResult | null = null
     let finalResponse = ''
     let totalSearchCost = 0
     let allSources: string[] = []
 
-    // Build messages array with conversation history
-    const messages: any[] = [
+    // Build messages array with conversation history for Responses API
+    const messages: ResponsesAPIMessage[] = [
       { 
         role: 'system', 
         content: IMMIGRATION_SYSTEM_PROMPT 
@@ -118,7 +124,7 @@ export async function askImmigrationQuestion(
     // Add conversation history
     conversationHistory.forEach(msg => {
       messages.push({
-        role: msg.role,
+        role: msg.role as 'user' | 'assistant',
         content: msg.content
       })
     })
@@ -129,14 +135,20 @@ export async function askImmigrationQuestion(
       content: question 
     })
 
+    // Convert search function definition to Responses API format
+    const tools: ResponsesAPITool[] = [{
+      type: 'function',
+      function: SEARCH_FUNCTION_DEFINITION.function
+    }]
+
     // Decide if we should strongly bias toward using the search tool
     const forceSearch = shouldForceSearch(question)
 
-    // Temporary fallback to Chat Completions until Responses API access is confirmed
-    const response = await client.chat.completions.create({
+    // Use Responses API
+    const response = await getResponsesClient().create({
       model,
       messages,
-      tools: [SEARCH_FUNCTION_DEFINITION],
+      tools,
       tool_choice: forceSearch 
         ? { type: 'function', function: { name: 'search_current_immigration_info' } }
         : 'auto',
@@ -144,16 +156,16 @@ export async function askImmigrationQuestion(
       temperature: 0.7
     })
 
-    const message = response.choices[0]?.message
-    if (!message) {
-      throw new Error('No response message received from OpenAI')
+    // Check if response has content or tool calls
+    if (!response.output && !response.tool_calls?.length) {
+      throw new Error('No response received from Responses API')
     }
 
     // Check if AI wants to use search function
-    if (message.tool_calls?.length) {
-      logger.info('AI requested search function')
+    if (response.tool_calls?.length) {
+      logger.info('AI requested search function via Responses API')
       
-      const searchCall = message.tool_calls[0]
+      const searchCall = response.tool_calls[0]
       if (searchCall.function?.name === 'search_current_immigration_info') {
         try {
           const functionArgs = JSON.parse(searchCall.function.arguments)
@@ -165,55 +177,45 @@ export async function askImmigrationQuestion(
           totalSearchCost = searchResult.cost_cents
           allSources = searchResult.sources
           
-          // Continue conversation with search results - fall back to Chat Completions for tool follow-up
-          const followUpResponse = await client.chat.completions.create({
+          // Continue conversation with search results using Responses API
+          const followUpMessages: ResponsesAPIMessage[] = [
+            { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
+            { role: 'user', content: question },
+            { role: 'assistant', content: null, tool_calls: response.tool_calls },
+            { 
+              role: 'tool', 
+              tool_call_id: searchCall.id,
+              content: searchResult.content
+            }
+          ]
+
+          const followUpResponse = await getResponsesClient().create({
             model,
-            messages: [
-              { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
-              { role: 'user', content: question },
-              { role: 'assistant', content: null, tool_calls: message.tool_calls },
-              { 
-                role: 'tool', 
-                tool_call_id: searchCall.id,
-                content: searchResult.content
-              }
-            ],
+            messages: followUpMessages,
             max_tokens: 500,
             temperature: 0.7
           })
           
-          finalResponse = followUpResponse.choices[0]?.message?.content || ''
+          finalResponse = followUpResponse.output || ''
           
-          // Add search usage to total - Chat Completions API
-          const followUpUsage = followUpResponse.usage || { 
-            prompt_tokens: 0, 
-            completion_tokens: 0, 
-            total_tokens: 0
-          }
-          
-          // Get initial usage from Chat Completions API  
-          const initialUsage = response.usage || { 
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: 0
-          }
-          
-          // Aggregate usage from both API calls
-          response.usage = {
-            prompt_tokens: initialUsage.prompt_tokens + followUpUsage.prompt_tokens,
-            completion_tokens: initialUsage.completion_tokens + followUpUsage.completion_tokens,
-            total_tokens: initialUsage.total_tokens + followUpUsage.total_tokens
+          // Aggregate usage from both API calls - Responses API format
+          if (response.usage && followUpResponse.usage) {
+            response.usage = {
+              input_tokens: response.usage.input_tokens + followUpResponse.usage.input_tokens,
+              cached_tokens: response.usage.cached_tokens + followUpResponse.usage.cached_tokens,
+              output_tokens: response.usage.output_tokens + followUpResponse.usage.output_tokens
+            }
           }
           
         } catch (error) {
           logger.error({ error }, 'Search function execution failed')
-          finalResponse = message.content || 'Lo siento, hubo un error procesando tu consulta.'
+          finalResponse = response.output || 'Lo siento, hubo un error procesando tu consulta.'
         }
       }
     } else {
       // No function call chosen by the model
       if (forceSearch) {
-        logger.info('Force-search heuristic triggered; performing manual search')
+        logger.info('Force-search heuristic triggered; performing manual search with Responses API')
         try {
           const manualSearch = await searchHandler.handleSearchFunction({
             name: 'search_current_immigration_info',
@@ -224,36 +226,39 @@ export async function askImmigrationQuestion(
             totalSearchCost = manualSearch.cost_cents
             allSources = manualSearch.sources
 
-            // Use search results as contextual system message and get a refined answer
-            const followUpResponse = await client.chat.completions.create({
+            // Use search results as contextual system message and get a refined answer with Responses API
+            const followUpMessages: ResponsesAPIMessage[] = [
+              { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
+              { role: 'system', content: `Usa la siguiente información de búsqueda en tiempo real para responder con precisión y cita fuentes relevantes cuando apliquen.\n\n${manualSearch.content}` },
+              { role: 'user', content: question }
+            ]
+
+            const followUpResponse = await getResponsesClient().create({
               model,
-              messages: [
-                { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
-                { role: 'system', content: `Usa la siguiente información de búsqueda en tiempo real para responder con precisión y cita fuentes relevantes cuando apliquen.\n\n${manualSearch.content}` },
-                { role: 'user', content: question }
-              ],
+              messages: followUpMessages,
               max_tokens: 500,
               temperature: 0.7
             })
 
-            finalResponse = followUpResponse.choices[0]?.message?.content || ''
+            finalResponse = followUpResponse.output || ''
 
-            const followUpUsage = followUpResponse.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-            const initialUsage = response.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-            response.usage = {
-              prompt_tokens: initialUsage.prompt_tokens + followUpUsage.prompt_tokens,
-              completion_tokens: initialUsage.completion_tokens + followUpUsage.completion_tokens,
-              total_tokens: initialUsage.total_tokens + followUpUsage.total_tokens
+            // Aggregate usage - Responses API format
+            if (response.usage && followUpResponse.usage) {
+              response.usage = {
+                input_tokens: response.usage.input_tokens + followUpResponse.usage.input_tokens,
+                cached_tokens: response.usage.cached_tokens + followUpResponse.usage.cached_tokens,
+                output_tokens: response.usage.output_tokens + followUpResponse.usage.output_tokens
+              }
             }
           } else {
-            finalResponse = message.content || ''
+            finalResponse = response.output || ''
           }
         } catch (error) {
           logger.error({ error }, 'Manual search fallback failed')
-          finalResponse = message.content || ''
+          finalResponse = response.output || ''
         }
       } else {
-        finalResponse = message.content || ''
+        finalResponse = response.output || ''
       }
     }
 
@@ -261,45 +266,47 @@ export async function askImmigrationQuestion(
       throw new Error('No final response generated')
     }
 
+    // Use Responses API usage structure directly
     const usage = response.usage ?? { 
-      prompt_tokens: 0, 
-      completion_tokens: 0, 
-      total_tokens: 0
+      input_tokens: 0, 
+      cached_tokens: 0, 
+      output_tokens: 0
     }
 
-    // Calculate accurate cost using GPT-4.1 pricing (Chat Completions uses prompt/completion tokens)
+    // Calculate accurate cost using GPT-4.1 pricing with Responses API token structure
     const costDetails = calculateAccurateCost(model, {
-      input_tokens: usage.prompt_tokens,
-      input_tokens_details: { cached_tokens: 0 }, // Chat Completions doesn't provide cached token info
-      output_tokens: usage.completion_tokens
+      input_tokens: usage.input_tokens,
+      input_tokens_details: { cached_tokens: usage.cached_tokens },
+      output_tokens: usage.output_tokens
     })
 
     const totalCostCents = costDetails.cost_usd_cents + totalSearchCost
 
     logger.info({ 
       model,
-      tokens: usage.total_tokens, 
-      inputTokens: costDetails.input_tokens,
-      cachedTokens: costDetails.cached_tokens,
-      outputTokens: costDetails.output_tokens,
+      tokens: usage.input_tokens + usage.output_tokens, 
+      inputTokens: usage.input_tokens,
+      cachedTokens: usage.cached_tokens,
+      outputTokens: usage.output_tokens,
       openaiCostUsd: costDetails.cost_usd,
       openaiCostCents: costDetails.cost_usd_cents,
       searchCostCents: totalSearchCost,
       totalCostCents,
       searchUsed: Boolean(searchResult),
       sourcesFound: allSources.length,
-      responseLength: finalResponse.length 
-    }, 'Immigration question processed with accurate pricing')
+      responseLength: finalResponse.length,
+      apiType: 'responses'
+    }, 'Immigration question processed with Responses API')
 
     return {
       text: finalResponse,
       usage: {
-        prompt_tokens: costDetails.input_tokens,
-        completion_tokens: costDetails.output_tokens,
-        total_tokens: costDetails.input_tokens + costDetails.output_tokens,
-        input_tokens: costDetails.input_tokens,
-        cached_tokens: costDetails.cached_tokens,
-        output_tokens: costDetails.output_tokens
+        prompt_tokens: usage.input_tokens,  // For backwards compatibility
+        completion_tokens: usage.output_tokens,  // For backwards compatibility
+        total_tokens: usage.input_tokens + usage.output_tokens,
+        input_tokens: usage.input_tokens,
+        cached_tokens: usage.cached_tokens,
+        output_tokens: usage.output_tokens
       },
       cost_details: costDetails,
       cost_cents: totalCostCents,
@@ -314,6 +321,7 @@ export async function askImmigrationQuestion(
     // Provide fallback response for better UX
     const fallbackCostDetails = calculateAccurateCost(process.env.OPENAI_MODEL ?? 'gpt-4.1', {
       input_tokens: 0,
+      input_tokens_details: { cached_tokens: 0 },
       output_tokens: 0
     })
     

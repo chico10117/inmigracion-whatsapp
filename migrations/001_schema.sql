@@ -49,12 +49,13 @@ create table if not exists public.credit_ledger (
 );
 
 -- Vistas métricas simples
-create view public.metrics_daily as
+drop view if exists public.metrics_daily;
+create or replace view public.metrics_daily as
 select
-  date_trunc('day', created_at) as day,
-  count(distinct phone_e164) filter (where credits_cents=300) as new_users_est,
-  count(*) filter (where role='user') as user_msgs,
-  sum(cost_cents) as ia_cost_cents
+  date_trunc('day', coalesce(m.created_at, u.created_at)) as day,
+  count(distinct u.phone_e164) filter (where u.credits_cents=300) as new_users_est,
+  count(*) filter (where m.role='user') as user_msgs,
+  coalesce(sum(m.cost_cents), 0) as ia_cost_cents
 from public.users u
 left join public.conversations c on c.user_id=u.id
 left join public.messages m on m.conversation_id=c.id

@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger'
+import { supa } from '../db/supabase'
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -70,6 +71,9 @@ export function addUserMessage(phoneE164: string, content: string): Conversation
     messageCount: conversation.messages.length 
   }, 'Added user message to conversation')
   
+  // Persist to DB asynchronously if configured
+  void persistMessage(phoneE164, 'user', content)
+  
   return conversation
 }
 
@@ -98,6 +102,9 @@ export function addAssistantMessage(phoneE164: string, content: string): void {
     phoneE164, 
     messageCount: conversation.messages.length 
   }, 'Added assistant message to conversation')
+
+  // Persist to DB asynchronously if configured
+  void persistMessage(phoneE164, 'assistant', content)
 }
 
 export function clearConversation(phoneE164: string): void {
@@ -108,4 +115,57 @@ export function clearConversation(phoneE164: string): void {
 export function getConversationMessages(phoneE164: string): Message[] {
   const conversation = getConversation(phoneE164)
   return conversation ? conversation.messages : []
+}
+
+async function persistMessage(phoneE164: string, role: 'user' | 'assistant', content: string): Promise<void> {
+  try {
+    if (!supa) return
+
+    // Ensure a conversation row exists for this user
+    const { data: user } = await supa
+      .from('users')
+      .select('id')
+      .eq('phone_e164', phoneE164)
+      .maybeSingle()
+
+    if (!user) {
+      // If user not found (e.g., supa misconfigured), skip
+      return
+    }
+
+    // Find open conversation or create new
+    const { data: existing } = await supa
+      .from('conversations')
+      .select('id, last_msg_at')
+      .eq('user_id', user.id)
+      .order('last_msg_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle()
+
+    const nowIso = new Date().toISOString()
+    let conversationId: string
+
+    if (!existing) {
+      const { data: created, error: convErr } = await supa
+        .from('conversations')
+        .insert({ user_id: user.id, started_at: nowIso, last_msg_at: nowIso })
+        .select('id')
+        .single()
+      if (convErr || !created) return
+      conversationId = created.id
+    } else {
+      conversationId = existing.id
+      await supa
+        .from('conversations')
+        .update({ last_msg_at: nowIso })
+        .eq('id', conversationId)
+    }
+
+    // Insert message
+    await supa
+      .from('messages')
+      .insert({ conversation_id: conversationId, role, content })
+  } catch (error) {
+    logger.error({ error, phoneE164 }, 'Failed to persist conversation message')
+  }
 }

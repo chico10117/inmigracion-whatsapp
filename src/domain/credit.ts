@@ -10,6 +10,7 @@ export interface User {
   created_at: string
   lang: string
   is_blocked: boolean
+  package: 'free' | '5' | '10' | '15'
 }
 
 // Feature flags for switching between credit and message limit systems
@@ -39,7 +40,8 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
         message_count: 0, // Current usage tracking
         created_at: new Date().toISOString(),
         lang: 'es',
-        is_blocked: false
+        is_blocked: false,
+        package: 'free'
       }
       
       mockUsers.set(phoneE164, newMockUser)
@@ -68,7 +70,8 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
         phone_e164: phoneE164,
         credits_cents: initialCredits,
         message_count: 0,
-        lang: 'es'
+        lang: 'es',
+        package: 'free'
       })
       .select('*')
       .single()
@@ -101,7 +104,7 @@ export async function hasCredits(userId: string): Promise<boolean> {
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find mock user by ID and check credits
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           return user.credits_cents > 0
         }
@@ -127,7 +130,7 @@ export async function canAfford(userId: string, costCents: number): Promise<bool
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find mock user by ID and check if they can afford the cost
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           return user.credits_cents >= costCents
         }
@@ -153,7 +156,7 @@ export async function getUserCredits(userId: string): Promise<number> {
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find mock user by ID and return credits
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           return user.credits_cents
         }
@@ -183,7 +186,7 @@ export async function debitCredits(
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find and update mock user credits
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           user.credits_cents = Math.max(0, user.credits_cents - costCents)
           logger.info({ userId, costCents, newBalance: user.credits_cents }, 'Mock debit for testing')
@@ -252,7 +255,7 @@ export async function hasMessagesRemaining(userId: string): Promise<boolean> {
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find mock user by ID and check message count
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           return user.message_count < MESSAGE_LIMIT
         }
@@ -278,7 +281,7 @@ export async function incrementMessageCount(userId: string): Promise<number> {
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find and update mock user message count
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           user.message_count += 1
           logger.info({ userId, newCount: user.message_count, limit: MESSAGE_LIMIT }, 'Mock message count incremented')
@@ -326,7 +329,7 @@ export async function getUserMessageCount(userId: string): Promise<number> {
   try {
     if (!supa || userId.startsWith('mock-')) {
       // Find mock user by ID and return message count
-      for (const [phone, user] of mockUsers.entries()) {
+      for (const user of mockUsers.values()) {
         if (user.id === userId) {
           return user.message_count
         }

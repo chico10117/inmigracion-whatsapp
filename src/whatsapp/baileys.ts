@@ -18,6 +18,9 @@ import { addUserMessage, addAssistantMessage, getConversationMessages, clearConv
 export class WhatsAppBot {
   private socket: ReturnType<typeof makeWASocket> | null = null
   private isConnecting = false
+  
+  // Authorized phone numbers that can use the bot
+  private readonly authorizedNumbers = ['+34686468168', '+5215555042401', '+34603114264']
 
   async start(): Promise<void> {
     if (this.isConnecting) {
@@ -112,6 +115,20 @@ export class WhatsAppBot {
       return
     }
 
+    // Extract phone number and check authorization FIRST
+    const phoneE164 = this.extractPhoneNumber(message.key.remoteJid!)
+    
+    if (!phoneE164) {
+      logger.warn({ remoteJid: message.key.remoteJid }, 'Could not extract phone number')
+      return
+    }
+
+    // Only respond to authorized phone numbers - check BEFORE any message sending
+    if (!this.authorizedNumbers.includes(phoneE164)) {
+      logger.info({ phoneE164 }, 'Ignoring message from unauthorized number')
+      return
+    }
+
     const messageType = Object.keys(message.message)[0]
     
     // Only process text messages for MVP
@@ -126,13 +143,6 @@ export class WhatsAppBot {
     const text = message.message.conversation || 
                  message.message.extendedTextMessage?.text || ''
 
-    const phoneE164 = this.extractPhoneNumber(message.key.remoteJid!)
-    
-    if (!phoneE164) {
-      logger.warn({ remoteJid: message.key.remoteJid }, 'Could not extract phone number')
-      return
-    }
-
     logger.info({ 
       phoneE164, 
       messageLength: text.length,
@@ -143,22 +153,17 @@ export class WhatsAppBot {
   }
 
   private async handleUserMessage(phoneE164: string, text: string): Promise<void> {
-    // Only respond to authorized phone numbers
-    const authorizedNumbers = ['+34686468168', '+5215555042401']
-    if (!authorizedNumbers.includes(phoneE164)) {
-      logger.info({ phoneE164 }, 'Ignoring message from unauthorized number')
-      return
-    }
-
+    // Authorization already checked in processMessage()
+    
+    const jid = phoneE164.replace('+', '') + '@s.whatsapp.net'
+    
     // Get or create user
     const user = await ensureUser(phoneE164)
     if (!user) {
       logger.error({ phoneE164 }, 'Failed to ensure user')
-      await this.sendMessage(phoneE164, MESSAGES.error())
+      await this.sendMessage(jid, MESSAGES.error())
       return
     }
-
-    const jid = phoneE164.replace('+', '') + '@s.whatsapp.net'
     const isNewUser = isFirstInteraction(phoneE164)
 
     // Handle BAJA command first

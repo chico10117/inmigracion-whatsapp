@@ -9,7 +9,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom'
 import * as qrcode from 'qrcode-terminal'
 import { logger } from '../utils/logger'
-import { ensureUser, hasCredits, canAfford, getUserCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction } from '../domain/credit'
+import { ensureUser, hasCredits, canAfford, getUserCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction, hasMessagesRemaining, incrementMessageCount, getUserMessageCount, USE_CREDIT_SYSTEM } from '../domain/credit'
 import { askImmigrationQuestion, ConversationMessage } from '../llm/openai'
 import { isContentAppropriate } from '../llm/moderation'
 import { MESSAGES, COMMANDS } from '../domain/flows'
@@ -205,12 +205,22 @@ export class WhatsAppBot {
       return
     }
 
-    // Check credits
-    const userHasCredits = await hasCredits(user.id)
-    if (!userHasCredits) {
-      const links = getTopupLinks()
-      await this.sendMessage(jid, MESSAGES.noCredits(links))
-      return
+    // Check usage limits (credits vs message count based on feature flag)
+    if (USE_CREDIT_SYSTEM) {
+      // Future: credit-based system
+      const userHasCredits = await hasCredits(user.id)
+      if (!userHasCredits) {
+        const links = getTopupLinks()
+        await this.sendMessage(jid, MESSAGES.noCredits(links))
+        return
+      }
+    } else {
+      // Current: message limit system
+      const userHasMessages = await hasMessagesRemaining(user.id)
+      if (!userHasMessages) {
+        await this.sendMessage(jid, MESSAGES.messageLimitReached())
+        return
+      }
     }
 
     // Add user message to conversation history
@@ -236,15 +246,20 @@ export class WhatsAppBot {
       // Add assistant response to conversation history
       addAssistantMessage(phoneE164, response.text)
       
-      // Debit credits based on actual usage
-      await debitCredits(user.id, response.cost_cents)
+      // Handle usage tracking (credits vs message count)
+      let finalUsageInfo
+      if (USE_CREDIT_SYSTEM) {
+        // Future: debit credits based on actual usage
+        await debitCredits(user.id, response.cost_cents)
+        finalUsageInfo = await getUserCredits(user.id)
+      } else {
+        // Current: increment message count
+        finalUsageInfo = await incrementMessageCount(user.id)
+      }
       
       await this.sendMessage(jid, response.text)
       
-      // Get final user credits after debit
-      const finalCredits = await getUserCredits(user.id)
-      
-      logger.info({ 
+      const logData: any = {
         phoneE164,
         model: process.env.OPENAI_MODEL,
         tokens: response.usage.total_tokens,
@@ -256,9 +271,21 @@ export class WhatsAppBot {
         searchCostCents: response.search_cost_cents,
         searchUsed: response.search_used,
         conversationLength: conversationHistory.length,
-        finalCreditsUsdCents: finalCredits,
-        finalCreditsDisplayEur: (finalCredits / 100).toFixed(2) // Shown as EUR to users (1:1 rate)
-      }, 'Immigration question processed with accurate cost tracking')
+        useCreditSystem: USE_CREDIT_SYSTEM
+      }
+
+      if (USE_CREDIT_SYSTEM) {
+        logData.finalCreditsUsdCents = finalUsageInfo
+        logData.finalCreditsDisplayEur = (finalUsageInfo / 100).toFixed(2)
+      } else {
+        logData.messageCount = finalUsageInfo
+        logData.messagesRemaining = 100 - finalUsageInfo
+      }
+
+      logger.info(logData, USE_CREDIT_SYSTEM ? 
+        'Immigration question processed with credit tracking' : 
+        'Immigration question processed with message count tracking'
+      )
 
     } catch (error) {
       logger.error({ error, phoneE164 }, 'Error processing immigration question')

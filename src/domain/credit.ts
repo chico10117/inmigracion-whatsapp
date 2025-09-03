@@ -6,10 +6,15 @@ export interface User {
   id: string
   phone_e164: string
   credits_cents: number
+  message_count: number
   created_at: string
   lang: string
   is_blocked: boolean
 }
+
+// Feature flags for switching between credit and message limit systems
+export const USE_CREDIT_SYSTEM = process.env.USE_CREDIT_SYSTEM === 'true'
+export const MESSAGE_LIMIT = Number(process.env.MESSAGE_LIMIT ?? 100)
 
 // In-memory mock user storage for testing
 const mockUsers = new Map<string, User>()
@@ -30,7 +35,8 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
       const newMockUser: User = {
         id: `mock-${phoneE164}`,
         phone_e164: phoneE164,
-        credits_cents: 30, // $0.30 USD (shown as €0.30 to users)
+        credits_cents: 30, // $0.30 USD (shown as €0.30 to users) - for future use
+        message_count: 0, // Current usage tracking
         created_at: new Date().toISOString(),
         lang: 'es',
         is_blocked: false
@@ -61,6 +67,7 @@ export async function ensureUser(phoneE164: string): Promise<User | null> {
       .insert({
         phone_e164: phoneE164,
         credits_cents: initialCredits,
+        message_count: 0,
         lang: 'es'
       })
       .select('*')
@@ -238,6 +245,107 @@ export function isFirstInteraction(phoneE164: string): boolean {
 
 export function clearFirstInteraction(phoneE164: string): void {
   firstInteraction.delete(phoneE164)
+}
+
+// Message limit functions (current system)
+export async function hasMessagesRemaining(userId: string): Promise<boolean> {
+  try {
+    if (!supa || userId.startsWith('mock-')) {
+      // Find mock user by ID and check message count
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          return user.message_count < MESSAGE_LIMIT
+        }
+      }
+      return true // Default for testing
+    }
+
+    const { data } = await supa
+      .from('users')
+      .select('message_count')
+      .eq('id', userId)
+      .single()
+
+    return (data?.message_count ?? 0) < MESSAGE_LIMIT
+
+  } catch (error) {
+    logger.error({ error, userId }, 'Error checking user message count')
+    return false
+  }
+}
+
+export async function incrementMessageCount(userId: string): Promise<number> {
+  try {
+    if (!supa || userId.startsWith('mock-')) {
+      // Find and update mock user message count
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          user.message_count += 1
+          logger.info({ userId, newCount: user.message_count, limit: MESSAGE_LIMIT }, 'Mock message count incremented')
+          return user.message_count
+        }
+      }
+      return 1 // Default for testing
+    }
+
+    const { data: user } = await supa
+      .from('users')
+      .select('message_count')
+      .eq('id', userId)
+      .single()
+
+    if (!user) {
+      logger.error({ userId }, 'User not found for message count increment')
+      return 0
+    }
+
+    const newCount = (user.message_count || 0) + 1
+
+    // Update user message count
+    await supa
+      .from('users')
+      .update({ message_count: newCount })
+      .eq('id', userId)
+
+    logger.info({ 
+      userId, 
+      oldCount: user.message_count || 0, 
+      newCount,
+      remaining: MESSAGE_LIMIT - newCount
+    }, 'Message count incremented')
+
+    return newCount
+
+  } catch (error) {
+    logger.error({ error, userId }, 'Error incrementing message count')
+    return 0
+  }
+}
+
+export async function getUserMessageCount(userId: string): Promise<number> {
+  try {
+    if (!supa || userId.startsWith('mock-')) {
+      // Find mock user by ID and return message count
+      for (const [phone, user] of mockUsers.entries()) {
+        if (user.id === userId) {
+          return user.message_count
+        }
+      }
+      return 0 // Default for testing
+    }
+
+    const { data } = await supa
+      .from('users')
+      .select('message_count')
+      .eq('id', userId)
+      .single()
+
+    return data?.message_count ?? 0
+
+  } catch (error) {
+    logger.error({ error, userId }, 'Error getting user message count')
+    return 0
+  }
 }
 
 export async function deleteUserData(userId: string): Promise<boolean> {

@@ -193,7 +193,7 @@ export const SEARCH_FUNCTION_DEFINITION = {
   type: 'function' as const,
   function: {
     name: 'search_current_immigration_info',
-    description: 'Busca información actualizada sobre inmigración española cuando se necesite información reciente, cambios en leyes, nuevos requisitos, tiempos de procesamiento actuales, o datos específicos que puedan haber cambiado.',
+    description: 'Busca información actualizada sobre inmigración española de forma proactiva cuando exista cualquier posibilidad de cambios recientes, variaciones por provincia o detalles sensibles a la fecha. Úsalo con frecuencia: cambios en leyes, nuevos requisitos/tasas/documentos, tiempos de procesamiento y citas, modelos y formularios oficiales, y cuando el usuario mencione años (2023+), "cambios", "nuevo" o "actualizado".',
     parameters: {
       type: 'object',
       properties: {
@@ -208,7 +208,7 @@ export const SEARCH_FUNCTION_DEFINITION = {
         },
         search_reason: {
           type: 'string',
-          description: 'Breve explicación de por qué se necesita buscar información actual'
+          description: 'Breve explicación de por qué se necesita buscar información actual (p. ej. posible cambio reciente, variación provincial, referencia a año)'
         }
       },
       required: ['query']

@@ -2,7 +2,7 @@ export const MESSAGES = {
   welcome: (isNewUser: boolean = true) => `
 ¡Hola! Soy **Reco Extranjería** 🇪🇸
 
-${isNewUser ? 'Te regalo **€0.30 de saldo** para tus primeras consultas.' : ''}
+${isNewUser ? 'Tienes **100 consultas gratuitas** para probar el servicio.' : ''}
 
 Puedo ayudarte con información sobre:
 • Renovación de NIE/TIE
@@ -16,6 +16,21 @@ Puedo ayudarte con información sobre:
 📱 Al usar este servicio aceptas el tratamiento de tus datos. Escribe **BAJA** para eliminar todos tus datos.
 
 ¿En qué puedo ayudarte?`.trim(),
+
+  messageLimitReached: () => `
+🔐 **Has alcanzado el límite de 100 consultas**
+
+Gracias por probar Reco Extranjería. Has utilizado todas tus consultas gratuitas.
+
+Próximamente estará disponible la versión premium con consultas ilimitadas.
+
+Mientras tanto, puedes consultar las siguientes fuentes oficiales:
+• Extranjería: https://sede.administracionespublicas.gob.es/
+• SEPE: https://www.sepe.es/
+• Ministerio Interior: https://www.interior.gob.es/
+• BOE: https://www.boe.es/
+
+Gracias por tu confianza. 🇪🇸`.trim(),
 
   noCredits: (links: string[]) => `
 💰 **Tu saldo es €0**

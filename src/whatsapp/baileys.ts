@@ -2,14 +2,13 @@ import makeWASocket, {
   useMultiFileAuthState, 
   ConnectionState, 
   WAMessage,
-  proto,
   DisconnectReason,
   fetchLatestBaileysVersion
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import * as qrcode from 'qrcode-terminal'
 import { logger } from '../utils/logger'
-import { ensureUser, hasCredits, canAfford, getUserCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction, hasMessagesRemaining, incrementMessageCount, getUserMessageCount, USE_CREDIT_SYSTEM } from '../domain/credit'
+import { ensureUser, hasCredits, getUserCredits, debitCredits, deleteUserData, getTopupLinks, isFirstInteraction, clearFirstInteraction, hasMessagesRemaining, incrementMessageCount, USE_CREDIT_SYSTEM } from '../domain/credit'
 import { askImmigrationQuestion, ConversationMessage } from '../llm/openai'
 import { isContentAppropriate } from '../llm/moderation'
 import { MESSAGES, COMMANDS } from '../domain/flows'
@@ -141,7 +140,7 @@ export class WhatsAppBot {
     }
 
     const text = message.message.conversation || 
-                 message.message.extendedTextMessage?.text || ''
+                 (message.message as any).extendedTextMessage?.text || ''
 
     logger.info({ 
       phoneE164, 
@@ -149,10 +148,11 @@ export class WhatsAppBot {
       messageType 
     }, 'Processing WhatsApp message')
 
-    await this.handleUserMessage(phoneE164, text)
+    const waId: string | undefined = message.key.id ?? undefined
+    await this.handleUserMessage(phoneE164, text, waId)
   }
 
-  private async handleUserMessage(phoneE164: string, text: string): Promise<void> {
+  private async handleUserMessage(phoneE164: string, text: string, waMessageId?: string): Promise<void> {
     // Authorization already checked in processMessage()
     
     const jid = phoneE164.replace('+', '') + '@s.whatsapp.net'
@@ -218,13 +218,13 @@ export class WhatsAppBot {
       // Current: message limit system
       const userHasMessages = await hasMessagesRemaining(user.id)
       if (!userHasMessages) {
-        await this.sendMessage(jid, MESSAGES.messageLimitReached())
+        await this.sendMessage(jid, MESSAGES.onlyText())
         return
       }
     }
 
-    // Add user message to conversation history
-    addUserMessage(phoneE164, text)
+    // Add user message to conversation history (and persist with WA id)
+    addUserMessage(phoneE164, text, waMessageId)
     
     // Get conversation history for context
     const conversationHistory = getConversationMessages(phoneE164)

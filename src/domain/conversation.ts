@@ -40,7 +40,7 @@ export function getConversation(phoneE164: string): Conversation | null {
   return conversation
 }
 
-export function addUserMessage(phoneE164: string, content: string): Conversation {
+export function addUserMessage(phoneE164: string, content: string, waMessageId?: string): Conversation {
   let conversation = getConversation(phoneE164)
   
   if (!conversation) {
@@ -72,7 +72,7 @@ export function addUserMessage(phoneE164: string, content: string): Conversation
   }, 'Added user message to conversation')
   
   // Persist to DB asynchronously if configured
-  void persistMessage(phoneE164, 'user', content)
+  void persistMessage(phoneE164, 'user', content, waMessageId)
   
   return conversation
 }
@@ -117,7 +117,7 @@ export function getConversationMessages(phoneE164: string): Message[] {
   return conversation ? conversation.messages : []
 }
 
-async function persistMessage(phoneE164: string, role: 'user' | 'assistant', content: string): Promise<void> {
+async function persistMessage(phoneE164: string, role: 'user' | 'assistant', content: string, waMessageId?: string): Promise<void> {
   try {
     if (!supa) return
 
@@ -161,10 +161,10 @@ async function persistMessage(phoneE164: string, role: 'user' | 'assistant', con
         .eq('id', conversationId)
     }
 
-    // Insert message
+    // Insert message with user_id and optional wa_message_id
     await supa
       .from('messages')
-      .insert({ conversation_id: conversationId, role, content })
+      .insert({ conversation_id: conversationId, user_id: user.id, role, content, wa_message_id: waMessageId })
   } catch (error) {
     logger.error({ error, phoneE164 }, 'Failed to persist conversation message')
   }

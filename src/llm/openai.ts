@@ -44,6 +44,16 @@ INSTRUCCIONES IMPORTANTES:
 - Cuando sea útil, menciona 1-2 fuentes oficiales (SEPE, Ministerio del Interior, Extranjería, BOE)
 - Si la consulta supera tu ámbito, recomienda contactar un profesional colegiado
 - Si necesitas más información para dar una respuesta precisa, pide los detalles mínimos necesarios
+- Le estás contestando a usuarios a través de WhatsApp, por lo que es importante que tomes en cuenta las siguentes reglas de formato:
+  - No uses ####, #### o ### para títulos.
+    FORMATO WHATSAPP — REGLAS RÁPIDAS
+    - Negrita: *texto*
+    - Cursiva: _texto_
+    - Tachado: ~texto~
+    - Lista con viñetas: empieza cada línea con "- " o "* "
+    - Lista numerada: empieza cada línea con "1. " (o el número que toque) + espacio
+    - Cita: empieza la línea con "> " + texto
+
 
 BÚSQUEDA DE INFORMACIÓN ACTUAL:
 - Usa la función search_current_immigration_info con frecuencia cuando exista cualquier posibilidad de cambios recientes o detalles específicos:
@@ -112,6 +122,7 @@ export async function askImmigrationQuestion(
     let finalResponse = ''
     let totalSearchCost = 0
     let allSources: string[] = []
+    let searchWasUsed = false
 
     // Build messages array with conversation history for Responses API
     const messages: ResponsesAPIMessage[] = [
@@ -135,23 +146,34 @@ export async function askImmigrationQuestion(
       content: question 
     })
 
-    // Convert search function definition to Responses API format
-    const tools: ResponsesAPITool[] = [{
-      type: 'function',
-      function: SEARCH_FUNCTION_DEFINITION.function
-    }]
+    // Choose search tool based on environment variable (AB testing)
+    const useOpenAIWebSearch = process.env.USE_OPENAI_WEB_SEARCH === 'true'
+    
+    const tools: ResponsesAPITool[] = useOpenAIWebSearch
+      ? [{ type: 'web_search' as const }] // OpenAI's built-in web search
+      : [{  // Perplexity-based custom search function
+          type: 'function',
+          function: SEARCH_FUNCTION_DEFINITION.function
+        }]
+
+    logger.info({ useOpenAIWebSearch, toolsCount: tools.length }, 'Selected search tool for AB testing')
 
     // Decide if we should strongly bias toward using the search tool
     const forceSearch = shouldForceSearch(question)
+
+    // Set tool choice based on search type and force search flag
+    const toolChoice = forceSearch 
+      ? (useOpenAIWebSearch 
+          ? { type: 'web_search' } 
+          : { type: 'function', function: { name: 'search_current_immigration_info' } })
+      : 'auto'
 
     // Use Responses API
     const response = await getResponsesClient().create({
       model,
       messages,
       tools,
-      tool_choice: forceSearch 
-        ? { type: 'function', function: { name: 'search_current_immigration_info' } }
-        : 'auto',
+      tool_choice: toolChoice,
       max_tokens: 500,
       temperature: 0.7
     })
@@ -161,12 +183,24 @@ export async function askImmigrationQuestion(
       throw new Error('No response received from Responses API')
     }
 
-    // Check if AI wants to use search function
+    // Handle tool calls based on search type
     if (response.tool_calls?.length) {
-      logger.info('AI requested search function via Responses API')
+      logger.info({ toolType: useOpenAIWebSearch ? 'openai_web_search' : 'perplexity', toolCallsCount: response.tool_calls.length }, 'AI requested search function via Responses API')
       
-      const searchCall = response.tool_calls[0]
-      if (searchCall.function?.name === 'search_current_immigration_info') {
+      if (useOpenAIWebSearch) {
+        // OpenAI's built-in web search - response should already contain integrated results
+        logger.info('Using OpenAI built-in web search - response already contains search results')
+        finalResponse = response.output || ''
+        searchWasUsed = true
+        
+        // For OpenAI web search, we don't have separate cost tracking (included in API cost)
+        // and sources are typically embedded in the response
+        allSources = [] // OpenAI handles sources internally
+        totalSearchCost = 0 // Included in main API cost
+      } else {
+        // Perplexity-based custom search function
+        const searchCall = response.tool_calls[0]
+        if (searchCall.function?.name === 'search_current_immigration_info') {
         try {
           const functionArgs = JSON.parse(searchCall.function.arguments)
           searchResult = await searchHandler.handleSearchFunction({
@@ -176,6 +210,7 @@ export async function askImmigrationQuestion(
           
           totalSearchCost = searchResult.cost_cents
           allSources = searchResult.sources
+          searchWasUsed = true
           
           // Continue conversation with search results using Responses API
           const followUpMessages: ResponsesAPIMessage[] = [
@@ -211,34 +246,66 @@ export async function askImmigrationQuestion(
           logger.error({ error }, 'Search function execution failed')
           finalResponse = response.output || 'Lo siento, hubo un error procesando tu consulta.'
         }
-      }
+        } // End of search_current_immigration_info check
+      } // End of Perplexity else block
     } else {
       // No function call chosen by the model
       if (forceSearch) {
-        logger.info('Force-search heuristic triggered; performing manual search with Responses API')
+        logger.info({ searchType: useOpenAIWebSearch ? 'openai' : 'perplexity' }, 'Force-search heuristic triggered; performing manual search with Responses API')
+        
         try {
-          const manualSearch = await searchHandler.handleSearchFunction({
-            name: 'search_current_immigration_info',
-            arguments: { query: question, search_reason: 'La consulta sugiere necesidad de información reciente' }
-          })
-
-          if (manualSearch.success) {
-            totalSearchCost = manualSearch.cost_cents
-            allSources = manualSearch.sources
-
-            // Use search results as contextual system message and get a refined answer with Responses API
-            const followUpMessages: ResponsesAPIMessage[] = [
-              { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
-              { role: 'system', content: `Usa la siguiente información de búsqueda en tiempo real para responder con precisión y cita fuentes relevantes cuando apliquen.\n\n${manualSearch.content}` },
-              { role: 'user', content: question }
-            ]
-
-            const followUpResponse = await getResponsesClient().create({
+          if (useOpenAIWebSearch) {
+            // Force search with OpenAI's built-in web search
+            logger.info('Forcing OpenAI web search in follow-up call')
+            
+            const searchResponse = await getResponsesClient().create({
               model,
-              messages: followUpMessages,
+              messages,
+              tools: [{ type: 'web_search' }],
+              tool_choice: { type: 'web_search' },
               max_tokens: 500,
               temperature: 0.7
             })
+            
+            finalResponse = searchResponse.output || ''
+            allSources = [] // OpenAI handles sources internally
+            totalSearchCost = 0 // Included in API cost
+            searchWasUsed = true
+            
+            // Aggregate usage from both calls
+            if (response.usage && searchResponse.usage) {
+              response.usage = {
+                input_tokens: response.usage.input_tokens + searchResponse.usage.input_tokens,
+                cached_tokens: response.usage.cached_tokens + searchResponse.usage.cached_tokens,
+                output_tokens: response.usage.output_tokens + searchResponse.usage.output_tokens
+              }
+            }
+            
+          } else {
+            // Force search with Perplexity
+            const manualSearch = await searchHandler.handleSearchFunction({
+              name: 'search_current_immigration_info',
+              arguments: { query: question, search_reason: 'La consulta sugiere necesidad de información reciente' }
+            })
+
+            if (manualSearch.success) {
+              totalSearchCost = manualSearch.cost_cents
+              allSources = manualSearch.sources
+              searchWasUsed = true
+
+              // Use search results as contextual system message and get a refined answer with Responses API
+              const followUpMessages: ResponsesAPIMessage[] = [
+                { role: 'system', content: IMMIGRATION_SYSTEM_PROMPT },
+                { role: 'system', content: `Usa la siguiente información de búsqueda en tiempo real para responder con precisión y cita fuentes relevantes cuando apliquen.\n\n${manualSearch.content}` },
+                { role: 'user', content: question }
+              ]
+
+              const followUpResponse = await getResponsesClient().create({
+                model,
+                messages: followUpMessages,
+                max_tokens: 500,
+                temperature: 0.7
+              })
 
             finalResponse = followUpResponse.output || ''
 
@@ -250,9 +317,10 @@ export async function askImmigrationQuestion(
                 output_tokens: response.usage.output_tokens + followUpResponse.usage.output_tokens
               }
             }
-          } else {
-            finalResponse = response.output || ''
-          }
+            } else {
+              finalResponse = response.output || ''
+            }
+          } // End of Perplexity force search else block
         } catch (error) {
           logger.error({ error }, 'Manual search fallback failed')
           finalResponse = response.output || ''
@@ -292,7 +360,8 @@ export async function askImmigrationQuestion(
       openaiCostCents: costDetails.cost_usd_cents,
       searchCostCents: totalSearchCost,
       totalCostCents,
-      searchUsed: Boolean(searchResult),
+      searchUsed: searchWasUsed,
+      searchType: useOpenAIWebSearch ? 'openai_builtin' : 'perplexity_api',
       sourcesFound: allSources.length,
       responseLength: finalResponse.length,
       apiType: 'responses'

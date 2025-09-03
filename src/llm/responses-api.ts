@@ -13,8 +13,8 @@ export interface ResponsesAPIMessage {
 }
 
 export interface ResponsesAPITool {
-  type: 'function'
-  function: {
+  type: 'function' | 'web_search'
+  function?: {
     name: string
     description: string
     parameters: any
@@ -26,7 +26,7 @@ export interface ResponsesAPIRequest {
   messages?: ResponsesAPIMessage[]
   input?: string | ResponsesAPIMessage[]
   tools?: ResponsesAPITool[]
-  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } }
+  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } } | { type: 'web_search' }
   max_tokens?: number
   temperature?: number
   stream?: boolean
@@ -93,9 +93,18 @@ class ResponsesAPIClient {
           responsesRequest.input = lastUserMessage || 'Hello'
         }
       } else if (request.messages) {
-        // Convert messages to input format
+        // Convert messages to input format, incorporating system prompt
+        const systemMessage = request.messages.find(m => m.role === 'system')
         const lastUserMessage = request.messages.filter(m => m.role === 'user').pop()?.content
-        responsesRequest.input = lastUserMessage || 'Hello'
+        
+        // Combine system prompt with user message for Responses API
+        if (systemMessage && lastUserMessage) {
+          responsesRequest.input = `${systemMessage.content}\n\nUser: ${lastUserMessage}`
+        } else if (lastUserMessage) {
+          responsesRequest.input = lastUserMessage
+        } else {
+          responsesRequest.input = 'Hello'
+        }
       }
 
       if (request.tools?.length) {
@@ -240,6 +249,40 @@ class ResponsesAPIClient {
             } else if (typeof message.content === 'string') {
               outputText = message.content
               logger.info({ textLength: message.content.length }, 'Found string content')
+            }
+          }
+          
+          // Handle function_call type messages
+          if (message.type === 'function_call') {
+            logger.info({
+              messageKeys: Object.keys(message),
+              functionName: message.function?.name,
+              hasArguments: Boolean(message.function?.arguments),
+              name: message.name,
+              arguments: message.arguments
+            }, 'Found function call message - debugging structure')
+            
+            // Extract tool calls from function_call message
+            // Try different possible structures
+            let functionName = message.function?.name || message.name
+            let functionArguments = message.function?.arguments || message.arguments
+            
+            if (functionName) {
+              toolCalls = [{
+                id: message.id || 'function_call_1',
+                type: 'function',
+                function: {
+                  name: functionName,
+                  arguments: functionArguments
+                }
+              }]
+              
+              logger.info({
+                extractedName: functionName,
+                extractedArgs: functionArguments
+              }, 'Extracted function call details')
+            } else {
+              logger.warn('Could not extract function call details from message')
             }
           }
           

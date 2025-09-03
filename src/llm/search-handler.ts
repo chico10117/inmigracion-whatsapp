@@ -36,12 +36,26 @@ export class SearchHandler {
       logger.info({ 
         query, 
         focus_sites, 
-        search_reason 
+        search_reason,
+        useOpenAIWebSearch: process.env.USE_OPENAI_WEB_SEARCH === 'true'
       }, 'Handling search function call')
+
+      // Check if OpenAI web search is enabled (AB testing)
+      if (process.env.USE_OPENAI_WEB_SEARCH === 'true') {
+        logger.warn('Perplexity search handler called but OpenAI web search is enabled - this should not happen')
+        return {
+          success: false,
+          content: 'La búsqueda está configurada para usar OpenAI. Este mensaje no debería aparecer.',
+          sources: [],
+          tokens_used: 0,
+          cost_cents: 0,
+          cached: false
+        }
+      }
 
       // Check if search is enabled
       if (!this.perplexity.isSearchEnabled()) {
-        logger.warn('Search requested but not enabled')
+        logger.warn('Perplexity search requested but not enabled')
         return {
           success: false,
           content: 'La búsqueda de información actual no está disponible en este momento. Responderé basándome en mi conocimiento general.',
